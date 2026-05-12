@@ -1214,6 +1214,7 @@ tr:hover td{background:var(--green-light)}
           </div>
         </div>
         <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" onclick="carregarCacheSupabase()">☁️ Carregar do banco</button>
           <button class="btn btn-outline btn-sm" onclick="exportarCosmos()">⬇️ Exportar comparativo</button>
         </div>
       </div>
@@ -3856,7 +3857,12 @@ function initCosmos() {
     document.getElementById('cosmos-lote-info').textContent =
       `${ativos.length.toLocaleString('pt-BR')} produtos ativos com EAN disponíveis para consulta.`;
   }
-  if (cosmosResults.length) { renderCosmosKpis(); renderCosmosTable(); }
+  // Auto-carrega cache do banco ao abrir a aba (se ainda não carregou)
+  if (cosmosResults.length === 0 && sbClient && currentUser) {
+    carregarCacheSupabase();
+  } else if (cosmosResults.length) {
+    renderCosmosKpis(); renderCosmosTable();
+  }
 }
 
 function saveCosmosToken() {
@@ -4031,7 +4037,52 @@ async function iniciarLote() {
   if (processados > 0) toast(`✅ ${processados} consultados e salvos no banco`, 'success');
 }
 
-function pararLote() { cosmosStop = true; toast('⏹ Interrompendo...', 'info'); }
+async function carregarCacheSupabase() {
+  if (!sbClient || !currentUser) { toast('⚠️ Faça login primeiro', 'error'); return; }
+  setSyncStatus('syncing');
+  try {
+    const { data: cached, error } = await sbClient.from('cosmos_cache').select('*').order('consultado_at', { ascending: false });
+    if (error) throw error;
+    if (!cached || cached.length === 0) { toast('Nenhum resultado no banco ainda. Inicie uma consulta.', 'info'); return; }
+
+    cosmosResults = cached.map(r => ({
+      prod: {
+        PRODUTO: r.produto_codigo, CODIGO_BARRAS: r.ean,
+        DESCRICAO_PRODUTO: r.descricao_thalia, NCM: r.ncm_thalia,
+        DESCRICAO_MARCA: r.marca_thalia, DESCRICAO_STATUS_COMPRA: 'Ativo'
+      },
+      cosmos: r.descricao_cosmos ? {
+        description: r.descricao_cosmos,
+        ncm: { code: r.ncm_cosmos },
+        brand: { name: r.marca_cosmos },
+        thumbnail: r.thumbnail
+      } : null,
+      status: r.status,
+      divergencias: r.divergencias || [],
+      erro: r.status === 'nao_encontrado' ? 'Não encontrado' : null
+    }));
+
+    document.getElementById('cosmos-kpis').style.display = '';
+    document.getElementById('cosmos-filtros').style.display = '';
+    document.getElementById('cosmos-table-wrap').style.display = 'block';
+    document.getElementById('cosmos-progress-wrap').style.display = 'block';
+    document.getElementById('cosmos-prog-label').textContent = `☁️ ${cached.length} resultados carregados do banco`;
+    document.getElementById('cosmos-prog-bar').style.width = '100%';
+    document.getElementById('cosmos-prog-pct').textContent = '100%';
+    document.getElementById('cosmos-prog-detail').textContent =
+      `NCM divergente: ${cosmosResults.filter(r=>r.status==='ncm_div').length} · Desc. diferente: ${cosmosResults.filter(r=>r.status==='desc_div').length} · OK: ${cosmosResults.filter(r=>r.status==='ok').length}`;
+
+    renderCosmosKpis();
+    renderCosmosTable();
+    setSyncStatus('online');
+    toast(`☁️ ${cached.length} resultados restaurados do banco!`, 'success');
+  } catch(e) {
+    setSyncStatus('offline');
+    toast('❌ Erro ao carregar: ' + e.message, 'error');
+  }
+}
+
+
 
 function fmtNcmStr(s) {
   s = (s||'').toString().replace(/\D/g, '');
