@@ -1149,9 +1149,13 @@ tr:hover td{background:var(--green-light)}
         <label style="font-size:11px;font-weight:600;color:var(--text-2);letter-spacing:.3px;text-transform:uppercase;display:block;margin-bottom:6px">Token da API Cosmos (X-Cosmos-Token)</label>
         <input type="text" id="cosmos-token" placeholder="pcgwjFpXRT18r5RW0_caUg" style="font-family:monospace;font-size:13px">
       </div>
-      <button class="btn btn-primary" onclick="saveCosmosToken()">💾 Salvar token</button>
+      <div style="flex:1;min-width:260px" id="cosmos-proxy-field">
+        <label style="font-size:11px;font-weight:600;color:var(--text-2);letter-spacing:.3px;text-transform:uppercase;display:block;margin-bottom:6px">URL do Proxy Cloudflare Worker</label>
+        <input type="text" id="cosmos-proxy-url" placeholder="https://cosmos-proxy.SEU-USUARIO.workers.dev/cosmos" style="font-family:monospace;font-size:12px">
+      </div>
+      <button class="btn btn-primary" onclick="saveCosmosToken()">💾 Salvar</button>
       <div style="font-size:12px;color:var(--text-3)">
-        Token encontrado em <a href="https://cosmos.bluesoft.com.br/api" target="_blank" style="color:var(--green)">cosmos.bluesoft.com.br/api</a>
+        Token em <a href="https://cosmos.bluesoft.com.br/api" target="_blank" style="color:var(--green)">cosmos.bluesoft.com.br/api</a>
       </div>
     </div>
     <div id="cosmos-token-status" style="margin-top:10px"></div>
@@ -3809,7 +3813,12 @@ onLoginSuccess = function() {
 // COSMOS BLUESOFT — COMPARATIVO
 // ============================================================
 const COSMOS_TOKEN_KEY = 'thalia_cosmos_token';
-const COSMOS_API = 'https://api.cosmos.bluesoft.com.br';
+const COSMOS_TOKEN_PROXY_KEY = 'thalia_cosmos_proxy';
+// Se estiver no GitHub Pages usa o proxy Cloudflare, senão chama direto
+const IS_GITHUB = location.hostname.includes('github.io') || location.hostname.includes('github.com');
+let COSMOS_API = IS_GITHUB
+  ? (localStorage.getItem(COSMOS_TOKEN_PROXY_KEY) || 'https://SEU-WORKER.workers.dev/cosmos')
+  : 'https://api.cosmos.bluesoft.com.br';
 let cosmosResults = [];
 let cosmosMode = 'lote';
 let cosmosFilter = '';
@@ -3822,9 +3831,24 @@ const COSMOS_PER_PAGE = 50;
 function initCosmos() {
   const token = localStorage.getItem(COSMOS_TOKEN_KEY) || '';
   document.getElementById('cosmos-token').value = token;
+
+  // Show/hide proxy field based on environment
+  const proxyField = document.getElementById('cosmos-proxy-field');
+  if (IS_GITHUB) {
+    proxyField.style.display = 'block';
+    const savedProxy = localStorage.getItem(COSMOS_TOKEN_PROXY_KEY) || '';
+    document.getElementById('cosmos-proxy-url').value = savedProxy;
+    if (!savedProxy) {
+      document.getElementById('cosmos-token-status').innerHTML =
+        `<div class="alert alert-yellow"><span class="alert-icon">⚠️</span>Você está no GitHub Pages — preencha também a URL do Proxy Cloudflare para o Cosmos funcionar.</div>`;
+    }
+  } else {
+    proxyField.style.display = 'none';
+  }
+
   if (token) {
     document.getElementById('cosmos-token-status').innerHTML =
-      `<div class="alert alert-green" style="display:inline-flex"><span class="alert-icon">✅</span>Token configurado.</div>`;
+      `<div class="alert alert-green" style="display:inline-flex"><span class="alert-icon">✅</span>Token configurado${IS_GITHUB ? ' — configure também o Proxy abaixo' : ''}.</div>`;
   }
   if (erpData.length) {
     const comEan = erpData.filter(r => r.CODIGO_BARRAS && r.CODIGO_BARRAS.length >= 7 && r.CODIGO_BARRAS !== '0' && r.CODIGO_BARRAS !== 'nan');
@@ -3839,9 +3863,23 @@ function saveCosmosToken() {
   const token = document.getElementById('cosmos-token').value.trim();
   if (!token) { toast('⚠️ Preencha o token', 'error'); return; }
   localStorage.setItem(COSMOS_TOKEN_KEY, token);
-  document.getElementById('cosmos-token-status').innerHTML =
-    `<div class="alert alert-green" style="display:inline-flex"><span class="alert-icon">✅</span>Token salvo!</div>`;
-  toast('✅ Token Cosmos salvo', 'success');
+
+  if (IS_GITHUB) {
+    const proxyUrl = document.getElementById('cosmos-proxy-url').value.trim();
+    if (proxyUrl) {
+      localStorage.setItem(COSMOS_TOKEN_PROXY_KEY, proxyUrl);
+      COSMOS_API = proxyUrl;
+      document.getElementById('cosmos-token-status').innerHTML =
+        `<div class="alert alert-green" style="display:inline-flex"><span class="alert-icon">✅</span>Token e Proxy salvos! Cosmos pronto para uso.</div>`;
+    } else {
+      document.getElementById('cosmos-token-status').innerHTML =
+        `<div class="alert alert-yellow"><span class="alert-icon">⚠️</span>Token salvo, mas URL do Proxy não preenchida. O Cosmos não funcionará no GitHub Pages sem o proxy.</div>`;
+    }
+  } else {
+    document.getElementById('cosmos-token-status').innerHTML =
+      `<div class="alert alert-green" style="display:inline-flex"><span class="alert-icon">✅</span>Token salvo!</div>`;
+  }
+  toast('✅ Configurações do Cosmos salvas', 'success');
 }
 
 function setCosmosMode(mode) {
