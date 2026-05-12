@@ -3934,13 +3934,39 @@ async function iniciarLote() {
   if (cosmosStatusFilter) base = base.filter(r => r.DESCRICAO_STATUS_COMPRA === cosmosStatusFilter);
 
   const limit = parseInt(document.getElementById('cosmos-lote-limit').value) || 0;
-  const lista = limit > 0 ? base.slice(0, limit) : base;
-  if (!lista.length) { toast('⚠️ Nenhum produto com EAN encontrado', 'error'); return; }
 
-  cosmosResults = [];
-  cosmosStop = false;
-  cosmosRunning = true;
+  // Carrega cache do Supabase — retoma de onde parou
+  let jaConsultados = new Set();
+  if (sbClient && currentUser) {
+    try {
+      const { data: cached } = await sbClient.from('cosmos_cache').select('*');
+      if (cached && cached.length > 0) {
+        const fromCache = cached.map(r => ({
+          prod: { PRODUTO: r.produto_codigo, CODIGO_BARRAS: r.ean, DESCRICAO_PRODUTO: r.descricao_thalia, NCM: r.ncm_thalia, DESCRICAO_MARCA: r.marca_thalia, DESCRICAO_STATUS_COMPRA: 'Ativo' },
+          cosmos: r.descricao_cosmos ? { description: r.descricao_cosmos, ncm: { code: r.ncm_cosmos }, brand: { name: r.marca_cosmos }, thumbnail: r.thumbnail } : null,
+          status: r.status, divergencias: r.divergencias || [],
+          erro: r.status === 'nao_encontrado' ? 'Não encontrado' : null
+        }));
+        fromCache.forEach(c => { if (!cosmosResults.find(x => x.prod.PRODUTO === c.prod.PRODUTO)) cosmosResults.push(c); });
+        cached.forEach(r => { jaConsultados.add(r.produto_codigo); if (r.ean) jaConsultados.add(r.ean); });
+        renderCosmosKpis(); renderCosmosTable();
+        toast(`☁️ ${cached.length} resultados carregados do cache`, 'success');
+      }
+    } catch(e) { console.warn('Erro cache:', e); }
+  }
 
+  const pendentes = base.filter(r => !jaConsultados.has(r.PRODUTO) && !jaConsultados.has(r.CODIGO_BARRAS));
+  const lista = limit > 0 ? pendentes.slice(0, limit) : pendentes;
+
+  if (!lista.length) {
+    toast('✅ Todos os produtos já foram consultados! Veja os resultados.', 'success');
+    document.getElementById('cosmos-kpis').style.display = '';
+    document.getElementById('cosmos-filtros').style.display = '';
+    document.getElementById('cosmos-table-wrap').style.display = 'block';
+    renderCosmosKpis(); renderCosmosTable(); return;
+  }
+
+  cosmosStop = false; cosmosRunning = true;
   document.getElementById('cosmos-start-btn').style.display = 'none';
   document.getElementById('cosmos-stop-btn').style.display = 'inline-flex';
   document.getElementById('cosmos-progress-wrap').style.display = 'block';
@@ -3950,34 +3976,59 @@ async function iniciarLote() {
 
   const total = lista.length;
   let processados = 0, encontrados = 0, erros = 0;
+  document.getElementById('cosmos-prog-detail').textContent = `${jaConsultados.size} já no cache · ${total} novos para consultar`;
 
   for (const prod of lista) {
     if (cosmosStop) break;
+    let result;
     try {
       const data = await fetchCosmos(prod.CODIGO_BARRAS);
-      cosmosResults.push(buildCosmosResult(prod, data));
+      result = buildCosmosResult(prod, data);
       if (data) encontrados++;
     } catch(e) {
-      cosmosResults.push(buildCosmosResult(prod, null, e.message));
+      result = buildCosmosResult(prod, null, e.message);
       erros++;
+      if (e.message.includes('429') || e.message.includes('Limite')) {
+        cosmosResults.push(result);
+        cosmosStop = true;
+        document.getElementById('cosmos-prog-label').textContent = '⏸ Limite atingido — resultados salvos. Troque o token ou aguarde 1h e continue.';
+        toast('⏸ Limite atingido — ' + processados + ' salvos. Continue depois!', 'info');
+        break;
+      }
     }
+    cosmosResults.push(result);
+
+    // Salva no Supabase
+    if (sbClient && currentUser && result) {
+      try {
+        await sbClient.from('cosmos_cache').upsert({
+          produto_codigo: prod.PRODUTO, ean: prod.CODIGO_BARRAS,
+          descricao_thalia: prod.DESCRICAO_PRODUTO, descricao_cosmos: result.cosmos?.description || null,
+          ncm_thalia: prod.NCM, ncm_cosmos: result.cosmos?.ncm?.code || null,
+          marca_thalia: prod.DESCRICAO_MARCA||prod.MARCA, marca_cosmos: result.cosmos?.brand?.name || null,
+          status: result.status, divergencias: result.divergencias,
+          thumbnail: result.cosmos?.thumbnail || null, consultado_at: new Date().toISOString()
+        }, { onConflict: 'produto_codigo' });
+      } catch(e) {}
+    }
+
     processados++;
     const pct = Math.round(processados / total * 100);
     document.getElementById('cosmos-prog-bar').style.width = pct + '%';
     document.getElementById('cosmos-prog-pct').textContent = pct + '%';
-    document.getElementById('cosmos-prog-label').textContent = `Consultando... ${processados.toLocaleString('pt-BR')} / ${total.toLocaleString('pt-BR')}`;
+    document.getElementById('cosmos-prog-label').textContent = `Consultando... ${processados.toLocaleString('pt-BR')} / ${total.toLocaleString('pt-BR')} novos`;
     document.getElementById('cosmos-prog-detail').textContent =
-      `Encontrados: ${encontrados} · Não encontrados: ${processados - encontrados - erros} · Erros: ${erros}`;
-    if (processados % 10 === 0) { renderCosmosKpis(); renderCosmosTable(); }
-    await new Promise(r => setTimeout(r, 2000)); // 2s entre chamadas
+      `Encontrados: ${encontrados} · Não encontrados: ${processados-encontrados-erros} · Erros: ${erros} · Cache: ${jaConsultados.size+processados}`;
+    if (processados % 5 === 0) { renderCosmosKpis(); renderCosmosTable(); }
+    await new Promise(r => setTimeout(r, 2000));
   }
 
   cosmosRunning = false;
   document.getElementById('cosmos-start-btn').style.display = 'inline-flex';
   document.getElementById('cosmos-stop-btn').style.display = 'none';
-  document.getElementById('cosmos-prog-label').textContent = cosmosStop ? '⏹ Consulta interrompida' : '✅ Consulta concluída!';
+  if (!cosmosStop) document.getElementById('cosmos-prog-label').textContent = `✅ Concluído! ${processados} novos + ${jaConsultados.size} cache = ${cosmosResults.length} total`;
   renderCosmosKpis(); renderCosmosTable();
-  toast(`✅ ${processados.toLocaleString('pt-BR')} produtos consultados`, 'success');
+  if (processados > 0) toast(`✅ ${processados} consultados e salvos no banco`, 'success');
 }
 
 function pararLote() { cosmosStop = true; toast('⏹ Interrompendo...', 'info'); }
