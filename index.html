@@ -4109,10 +4109,12 @@ function renderCosmosTable() {
 
     // Thumbnail
     const thumbUrl = r.cosmos?.thumbnail || `https://cdn-cosmos.bluesoft.com.br/products/${r.prod.CODIGO_BARRAS}`;
+    const safeDesc = (r.prod.DESCRICAO_PRODUTO||'').replace(/"/g,'&quot;');
     const imgCell = r.cosmos
       ? `<img class="cosmos-thumb" src="${thumbUrl}" alt="" loading="lazy"
+           data-url="${thumbUrl}" data-desc="${safeDesc}" data-ean="${r.prod.CODIGO_BARRAS}"
            onerror="this.outerHTML='<div class=\\"cosmos-no-img\\">📦</div>'"
-           onclick="openImgModal('${thumbUrl}','${(r.prod.DESCRICAO_PRODUTO||'').replace(/'/g,"\\'")}','${r.prod.CODIGO_BARRAS}')">`
+           onclick="openImgModal(this.dataset.url,this.dataset.desc,this.dataset.ean)">`
       : `<div class="cosmos-no-img">—</div>`;
 
     return `<tr>
