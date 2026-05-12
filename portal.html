@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal do Fornecedor — Thalia Perfumaria</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --green:#2EC4A5;--green-dark:#1a8a76;--green-light:#e8faf6;--green-mid:#d0f5ed;
+  --text:#1a1f2e;--text-2:#4b5567;--text-3:#8b96a8;--border:#e2e8f0;
+  --bg:#f8fafc;--white:#ffffff;--red:#e53e3e;--red-bg:#fff5f5;
+  --yellow:#d97706;--yellow-bg:#fffbeb;--shadow:0 1px 3px rgba(0,0,0,.08),0 4px 16px rgba(0,0,0,.04);
+  --radius:12px;
+}
+body{font-family:'DM Sans',sans-serif;color:var(--text);background:var(--bg);font-size:14px;line-height:1.6;min-height:100vh}
+
+/* HEADER */
+.header{background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;box-shadow:0 1px 8px rgba(0,0,0,.06)}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-text{font-family:'DM Serif Display',serif;font-size:20px;color:var(--text)}
+.logo-sub{font-size:10px;letter-spacing:3px;color:var(--text-3);text-transform:uppercase}
+.header-right{font-size:12px;color:var(--text-3)}
+
+/* MAIN */
+.main{max-width:860px;margin:0 auto;padding:32px 24px}
+
+/* WELCOME */
+.welcome{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:28px 32px;margin-bottom:24px;box-shadow:var(--shadow)}
+.welcome-label{font-size:11px;font-weight:600;color:var(--green);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.welcome-label::before{content:'';width:20px;height:2px;background:var(--green)}
+.welcome h1{font-size:22px;font-weight:600;margin-bottom:6px}
+.welcome p{font-size:13px;color:var(--text-2);line-height:1.7}
+
+/* PASSWORD SCREEN */
+#pwd-screen{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px}
+.pwd-box{background:var(--white);border:1px solid var(--border);border-radius:20px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.10);text-align:center}
+.pwd-logo{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:24px}
+.pwd-title{font-size:18px;font-weight:600;margin-bottom:6px}
+.pwd-sub{font-size:13px;color:var(--text-2);margin-bottom:24px;line-height:1.6}
+.pwd-err{background:var(--red-bg);border:1px solid #fca5a5;color:var(--red);padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;display:none}
+.pwd-input-wrap{position:relative;margin-bottom:14px}
+.pwd-input-wrap input{padding-right:44px;text-align:center;letter-spacing:3px;font-size:15px}
+.pwd-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-3);padding:4px}
+
+/* FORNECEDOR ID */
+.forn-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:24px;box-shadow:var(--shadow)}
+.forn-card h3{font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.forn-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* FORM */
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);margin-bottom:16px}
+.card-title{font-size:14px;font-weight:600;margin-bottom:18px;display:flex;align-items:center;gap:8px;color:var(--text)}
+.form-group{margin-bottom:14px}
+label{display:block;font-size:11px;font-weight:600;color:var(--text-2);margin-bottom:5px;letter-spacing:.3px;text-transform:uppercase}
+label .req{color:var(--red);margin-left:2px}
+input,select,textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:13px;outline:none;transition:border .2s,box-shadow .2s}
+input:focus,select:focus,textarea:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(46,196,165,.12)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* BUTTONS */
+.btn{padding:10px 20px;border-radius:8px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--green);color:#fff}
+.btn-primary:hover{background:var(--green-dark);box-shadow:0 4px 12px rgba(46,196,165,.3)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text-2)}
+.btn-outline:hover{border-color:var(--green);color:var(--green);background:var(--green-light)}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:6px}
+.btn-danger{background:var(--red-bg);border:1px solid #fca5a5;color:var(--red)}
+.btn-full{width:100%;justify-content:center;padding:12px}
+
+/* UPLOAD ZONE */
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:28px 16px;text-align:center;cursor:pointer;transition:all .2s;background:transparent}
+.upload-zone:hover{border-color:var(--green);background:var(--green-light)}
+.upload-zone p{font-size:13px;color:var(--text-2);margin-top:8px}
+.upload-zone strong{color:var(--green)}
+.upload-zone input{display:none}
+
+/* FILA */
+.fila-item{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:12px;margin-bottom:8px}
+.fila-num{width:24px;height:24px;border-radius:50%;background:var(--green);color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.fila-body{flex:1;min-width:0}
+.fila-desc{font-weight:600;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fila-meta{font-size:11px;color:var(--text-3);margin-top:2px}
+.fila-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.tag{display:inline-flex;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600}
+.tag-green{background:var(--green-light);color:var(--green-dark)}
+.tag-gray{background:var(--bg);border:1px solid var(--border);color:var(--text-3)}
+
+/* ALERT */
+.alert{padding:12px 16px;border-radius:8px;font-size:13px;display:flex;gap:10px;align-items:flex-start;margin-bottom:12px}
+.alert-green{background:var(--green-light);border:1px solid var(--green-mid);color:var(--green-dark)}
+.alert-red{background:var(--red-bg);border:1px solid #fca5a5;color:var(--red)}
+.alert-yellow{background:var(--yellow-bg);border:1px solid #fcd34d;color:var(--yellow)}
+.alert-icon{font-size:16px;flex-shrink:0}
+
+/* SUCCESS SCREEN */
+#success-screen{display:none;text-align:center;padding:48px 24px}
+.success-icon{font-size:56px;margin-bottom:16px}
+.success-title{font-size:22px;font-weight:600;margin-bottom:8px}
+.success-sub{font-size:14px;color:var(--text-2);margin-bottom:28px}
+
+/* PROGRESS */
+.progress-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:8px}
+.progress-fill{height:100%;background:var(--green);border-radius:3px;transition:width .3s ease}
+
+/* STEPS */
+.steps{display:flex;gap:0;margin-bottom:28px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--white)}
+.step{flex:1;padding:12px 16px;text-align:center;font-size:12px;font-weight:500;color:var(--text-3);border-right:1px solid var(--border);cursor:default;transition:all .2s}
+.step:last-child{border-right:none}
+.step.active{background:var(--green-light);color:var(--green-dark);font-weight:600}
+.step.done{background:var(--green);color:#fff}
+.step-num{display:inline-block;width:18px;height:18px;border-radius:50%;background:currentColor;color:var(--white);font-size:10px;font-weight:700;line-height:18px;text-align:center;margin-right:6px;opacity:.7}
+
+/* TOAST */
+#toast{position:fixed;bottom:20px;right:20px;padding:12px 18px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;background:var(--text);color:var(--white)}
+#toast.show{opacity:1}
+
+@media(max-width:600px){
+  .grid-2,.grid-3,.forn-row{grid-template-columns:1fr}
+  .main{padding:16px}
+  .steps{flex-direction:column}
+  .step{border-right:none;border-bottom:1px solid var(--border)}
+}
+/* PORTAL EDIT MODAL */
+#portal-edit-modal{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;display:none;align-items:center;justify-content:center;padding:20px}
+.pe-box{background:var(--white);border-radius:16px;padding:24px;width:100%;max-width:500px;box-shadow:0 16px 48px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto}
+.pe-title{font-size:15px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+</style>
+</head>
+<body>
+
+<!-- PORTAL EDIT MODAL -->
+<div id="portal-edit-modal" onclick="if(event.target===this)fecharEditPortal()">
+  <div class="pe-box">
+    <div class="pe-title">
+      ✏️ Editar produto
+      <button class="btn btn-outline btn-sm" onclick="fecharEditPortal()">✕</button>
+    </div>
+    <input type="hidden" id="pe-idx">
+    <div class="form-group">
+      <label>Descrição do produto <span class="req">*</span></label>
+      <input type="text" id="pe-desc" oninput="this.value=this.value.toUpperCase()">
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>EAN</label>
+        <input type="text" id="pe-ean" maxlength="14">
+      </div>
+      <div class="form-group">
+        <label>Código ref.</label>
+        <input type="text" id="pe-ref">
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Gramagem</label>
+        <input type="text" id="pe-gram">
+      </div>
+      <div class="form-group">
+        <label>NCM</label>
+        <input type="text" id="pe-ncm" maxlength="12" oninput="fmtNcm(this)">
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Custo (R$)</label>
+        <input type="number" id="pe-custo" step="0.01" min="0">
+      </div>
+      <div class="form-group">
+        <label>Venda (R$)</label>
+        <input type="number" id="pe-venda" step="0.01" min="0">
+      </div>
+    </div>
+    <div style="background:var(--green-light);border:1px solid var(--green-mid);border-radius:8px;padding:12px 14px;margin-bottom:14px">
+      <div style="font-size:11px;font-weight:600;color:var(--green-dark);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">% ICMS</div>
+      <div class="grid-2">
+        <div class="form-group" style="margin-bottom:0">
+          <label>Entrada</label>
+          <input type="text" id="pe-icms-e" placeholder="Ex: 12">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>Saída</label>
+          <input type="text" id="pe-icms-s" placeholder="Ex: 18">
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-outline" onclick="fecharEditPortal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarItemFila()">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="logo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 56" height="32">
+      <defs>
+        <linearGradient id="lg1" x1="0%" y1="100%" x2="60%" y2="0%"><stop offset="0%" stop-color="#c8c800"/><stop offset="100%" stop-color="#b8d400"/></linearGradient>
+        <linearGradient id="lg2" x1="0%" y1="100%" x2="50%" y2="0%"><stop offset="0%" stop-color="#7b6fcf"/><stop offset="100%" stop-color="#9b8ee0"/></linearGradient>
+        <linearGradient id="lg3" x1="0%" y1="100%" x2="40%" y2="0%"><stop offset="0%" stop-color="#e8007a"/><stop offset="100%" stop-color="#f03090"/></linearGradient>
+      </defs>
+      <path fill="url(#lg2)" opacity=".92" d="M20 47C16 42 14 35 16 27C18 20 22 14 24 8C26 14 27 20 26 26C25 31 23 35 24 40C25 44 28 46 28 46Z"/>
+      <path fill="url(#lg1)" opacity=".95" d="M14 49C10 44 9 37 11 29C13 22 17 16 18 8C21 15 21 22 20 29C19 35 17 39 18 44C19 47 21 49 21 49Z"/>
+      <path fill="url(#lg3)" opacity=".95" d="M26 49C23 43 23 36 25 29C27 22 30 16 30 9C33 15 34 22 33 29C32 35 29 40 30 44C31 47 32 49 32 49Z"/>
+    </svg>
+    <div>
+      <div class="logo-text">thalia</div>
+      <div class="logo-sub">perfumaria</div>
+    </div>
+  </div>
+  <div class="header-right">Portal de Cadastro de Produtos</div>
+</div>
+
+<!-- PASSWORD SCREEN -->
+<div id="pwd-screen">
+  <div class="pwd-box">
+    <div class="pwd-logo">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 56" height="36">
+        <defs>
+          <linearGradient id="lg1" x1="0%" y1="100%" x2="60%" y2="0%"><stop offset="0%" stop-color="#c8c800"/><stop offset="100%" stop-color="#b8d400"/></linearGradient>
+          <linearGradient id="lg2" x1="0%" y1="100%" x2="50%" y2="0%"><stop offset="0%" stop-color="#7b6fcf"/><stop offset="100%" stop-color="#9b8ee0"/></linearGradient>
+          <linearGradient id="lg3" x1="0%" y1="100%" x2="40%" y2="0%"><stop offset="0%" stop-color="#e8007a"/><stop offset="100%" stop-color="#f03090"/></linearGradient>
+        </defs>
+        <path fill="url(#lg2)" opacity=".92" d="M20 47C16 42 14 35 16 27C18 20 22 14 24 8C26 14 27 20 26 26C25 31 23 35 24 40C25 44 28 46 28 46Z"/>
+        <path fill="url(#lg1)" opacity=".95" d="M14 49C10 44 9 37 11 29C13 22 17 16 18 8C21 15 21 22 20 29C19 35 17 39 18 44C19 47 21 49 21 49Z"/>
+        <path fill="url(#lg3)" opacity=".95" d="M26 49C23 43 23 36 25 29C27 22 30 16 30 9C33 15 34 22 33 29C32 35 29 40 30 44C31 47 32 49 32 49Z"/>
+      </svg>
+      <div style="text-align:left">
+        <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--text)">thalia</div>
+        <div style="font-size:10px;letter-spacing:3px;color:var(--text-3)">perfumaria</div>
+      </div>
+    </div>
+    <div class="pwd-title">Portal do Fornecedor</div>
+    <div class="pwd-sub">Digite o código de acesso fornecido pela equipe Thalia para continuar.</div>
+    <div class="pwd-err" id="pwd-err">Código incorreto. Verifique e tente novamente.</div>
+    <div class="pwd-input-wrap">
+      <input type="password" id="pwd-input" placeholder="••••••••••" onkeydown="if(event.key==='Enter')checkPwd()" autocomplete="off">
+      <button class="pwd-toggle" onclick="togglePwdVis()" id="pwd-toggle-btn" tabindex="-1">👁️</button>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="checkPwd()" id="pwd-btn">Acessar Portal</button>
+    <div style="margin-top:16px;font-size:12px;color:var(--text-3)">Não tem o código? Entre em contato com a equipe Thalia.</div>
+  </div>
+</div>
+
+<div class="main" id="main-content" style="display:none">
+
+  <!-- TELA DE SUCESSO -->
+  <div id="success-screen">
+    <div class="success-icon">🎉</div>
+    <div class="success-title">Produtos enviados com sucesso!</div>
+    <div class="success-sub">A equipe Thalia receberá suas solicitações e entrará em contato em caso de dúvidas.</div>
+    <button class="btn btn-primary" onclick="resetForm()">Enviar mais produtos</button>
+  </div>
+
+  <!-- FORMULÁRIO PRINCIPAL -->
+  <div id="form-section">
+
+    <!-- STEPS -->
+    <div class="steps">
+      <div class="step done" id="step1">✓ Identificação</div>
+      <div class="step active" id="step2"><span class="step-num">2</span>Adicionar Produtos</div>
+      <div class="step" id="step3"><span class="step-num">3</span>Revisar e Enviar</div>
+    </div>
+
+    <!-- WELCOME -->
+    <div class="welcome">
+      <div class="welcome-label">Solicitação de Cadastro</div>
+      <h1>Cadastre seus produtos na Thalia Perfumaria</h1>
+      <p>Preencha os dados dos produtos que deseja cadastrar. Você pode adicionar um por um ou importar uma planilha. Após o envio, nossa equipe irá revisar e aprovar os cadastros.</p>
+    </div>
+
+    <!-- IDENTIFICAÇÃO DO FORNECEDOR -->
+    <div class="forn-card">
+      <h3>🏢 Identificação do Fornecedor</h3>
+      <div class="forn-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label>Nome da empresa <span class="req">*</span></label>
+          <input type="text" id="forn-nome" placeholder="Ex: Distribuidora XYZ Ltda" oninput="updateFornNome()">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>E-mail de contato</label>
+          <input type="email" id="forn-email" placeholder="contato@fornecedor.com.br">
+        </div>
+      </div>
+    </div>
+
+    <!-- ADICIONAR PRODUTO -->
+    <div class="card">
+      <div class="card-title">➕ Adicionar Produto</div>
+
+      <!-- UPLOAD PLANILHA -->
+      <div style="margin-bottom:20px">
+        <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.3px">Importar planilha preenchida</div>
+        <div class="upload-zone" onclick="document.getElementById('file-planilha').click()"
+          ondragover="event.preventDefault();this.style.borderColor='var(--green)'"
+          ondragleave="this.style.borderColor=''"
+          ondrop="event.preventDefault();this.style.borderColor='';handlePlanilha(event.dataTransfer.files[0])">
+          <div style="font-size:28px">📊</div>
+          <p><strong>Arraste a planilha aqui</strong> ou clique para selecionar<br><small style="color:var(--text-3)">Use o modelo enviado pela Thalia (.xlsx)</small></p>
+          <input type="file" id="file-planilha" accept=".xlsx,.xls" onchange="handlePlanilha(this.files[0])">
+        </div>
+        <div id="planilha-status" style="margin-top:8px"></div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:12px;color:var(--text-3);white-space:nowrap">ou preencha manualmente</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
+
+      <!-- FORMULÁRIO MANUAL -->
+      <div class="form-group">
+        <label>Descrição do produto <span class="req">*</span></label>
+        <input type="text" id="p-desc" placeholder="Ex: Shampoo Hidratação Intensiva 400ml" oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div class="grid-3">
+        <div class="form-group">
+          <label>EAN (cód. barras unitário)</label>
+          <input type="text" id="p-ean" placeholder="7891234567890" maxlength="14">
+        </div>
+        <div class="form-group">
+          <label>DUN (cód. barras caixa)</label>
+          <input type="text" id="p-dun" placeholder="17891234567897" maxlength="14">
+        </div>
+        <div class="form-group">
+          <label>Unidades por caixa</label>
+          <input type="number" id="p-unidcx" placeholder="Ex: 12" min="1">
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="form-group">
+          <label>Código ref. fornecedor</label>
+          <input type="text" id="p-ref" placeholder="REF-001">
+        </div>
+        <div class="form-group">
+          <label>Gramagem / Volume</label>
+          <input type="text" id="p-gram" placeholder="Ex: 400ML, 300G">
+        </div>
+        <div class="form-group">
+          <label>Marca</label>
+          <input type="text" id="p-marca" placeholder="Ex: LOREAL" oninput="this.value=this.value.toUpperCase()">
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="form-group">
+          <label>Preço de custo (R$)</label>
+          <input type="number" id="p-custo" placeholder="0,00" step="0.01" min="0">
+        </div>
+        <div class="form-group">
+          <label>Preço de venda sugerido (R$)</label>
+          <input type="number" id="p-venda" placeholder="0,00" step="0.01" min="0">
+        </div>
+        <div class="form-group">
+          <label>NCM</label>
+          <input type="text" id="p-ncm" placeholder="0000.00.00" maxlength="12" oninput="fmtNcm(this)">
+        </div>
+      </div>
+      <!-- ICMS -->
+      <div style="background:var(--green-light);border:1px solid var(--green-mid);border-radius:8px;padding:12px 14px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:600;color:var(--green-dark);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">% ICMS — Porcentagem fiscal do produto</div>
+        <div class="grid-2">
+          <div class="form-group" style="margin-bottom:0">
+            <label>% ICMS Entrada</label>
+            <input type="text" id="p-icms-entrada" placeholder="Ex: 12">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label>% ICMS Saída</label>
+            <input type="text" id="p-icms-saida" placeholder="Ex: 18">
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-outline" style="width:100%;justify-content:center" onclick="adicionarProduto()">+ Adicionar à lista</button>
+    </div>
+
+    <!-- FILA DE PRODUTOS -->
+    <div class="card" id="fila-card" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div class="card-title" style="margin-bottom:0">📋 Produtos na lista (<span id="fila-count">0</span>)</div>
+        <button class="btn btn-outline btn-sm" onclick="limparFila()">Limpar tudo</button>
+      </div>
+      <div id="fila-list"></div>
+      <div style="margin-top:16px">
+        <button class="btn btn-primary btn-full" id="btn-enviar" onclick="enviarTudo()">
+          🚀 Enviar para aprovação da Thalia
+        </button>
+        <div id="envio-progress" style="display:none;margin-top:12px">
+          <div style="font-size:12px;color:var(--text-2);margin-bottom:4px" id="envio-label">Enviando...</div>
+          <div class="progress-bar"><div class="progress-fill" id="envio-bar" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /form-section -->
+</div><!-- /main -->
+
+<div id="toast"></div>
+
+<script>
+const PORTAL_PWD = 'Thalia2026';
+const SB_URL = 'https://hvurlitjjigrkhlvitrs.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh2dXJsaXRqamlncmtobHZpdHJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MDU3MDAsImV4cCI6MjA5NDA4MTcwMH0.AgWGpX5im67Z71lVk0QE0_lc9whdTUZWlt5XdEsz1x4';
+let sbClient = null;
+let fila = [];
+
+function checkPwd() {
+  const val = document.getElementById('pwd-input').value;
+  const err = document.getElementById('pwd-err');
+  const btn = document.getElementById('pwd-btn');
+  if (val === PORTAL_PWD) {
+    // Salva sessão por 8h
+    sessionStorage.setItem('thalia_portal_auth', Date.now());
+    document.getElementById('pwd-screen').style.display = 'none';
+    document.getElementById('main-content').style.display = 'block';
+  } else {
+    err.style.display = 'block';
+    document.getElementById('pwd-input').value = '';
+    document.getElementById('pwd-input').focus();
+    btn.textContent = 'Tentar novamente';
+    setTimeout(() => { btn.textContent = 'Acessar Portal'; err.style.display = 'none'; }, 2500);
+  }
+}
+
+function togglePwdVis() {
+  const inp = document.getElementById('pwd-input');
+  const btn = document.getElementById('pwd-toggle-btn');
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+  else { inp.type = 'password'; btn.textContent = '👁️'; }
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+(function init() {
+  sbClient = supabase.createClient(SB_URL, SB_KEY);
+
+  // Verifica se já autenticou nesta sessão (8h)
+  const auth = sessionStorage.getItem('thalia_portal_auth');
+  if (auth && (Date.now() - parseInt(auth)) < 8 * 60 * 60 * 1000) {
+    document.getElementById('pwd-screen').style.display = 'none';
+    document.getElementById('main-content').style.display = 'block';
+  }
+
+  // Restaurar nome do fornecedor se já preencheu antes
+  const nome = localStorage.getItem('forn_nome');
+  const email = localStorage.getItem('forn_email');
+  if (nome) document.getElementById('forn-nome').value = nome;
+  if (email) document.getElementById('forn-email').value = email;
+})();
+
+function updateFornNome() {
+  localStorage.setItem('forn_nome', document.getElementById('forn-nome').value);
+}
+
+// ── UPLOAD PLANILHA ───────────────────────────────────────────
+function handlePlanilha(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+
+      // Lê SEM cabeçalho para detectar a linha correta
+      const raw = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, header: 1 });
+
+      // Encontra a linha de cabeçalho (que contém EAN ou DESCRIÇÃO ou CÓDIGO REF)
+      let headerRowIdx = -1;
+      for (let i = 0; i < raw.length; i++) {
+        const rowStr = raw[i].map(v => String(v||'').toUpperCase()).join('|');
+        if (rowStr.includes('EAN') && (rowStr.includes('DESCRI') || rowStr.includes('CODIGO REF') || rowStr.includes('CÓDIGO'))) {
+          headerRowIdx = i;
+          break;
+        }
+      }
+
+      if (headerRowIdx < 0) {
+        toast('⚠️ Não foi possível identificar o cabeçalho da planilha');
+        return;
+      }
+
+      const headers = raw[headerRowIdx].map(h => String(h||'').trim());
+      const dataRows = raw.slice(headerRowIdx + 1);
+
+      // Monta objetos com os headers corretos
+      const rows = dataRows.map(r => {
+        const obj = {};
+        headers.forEach((h, i) => { if (h) obj[h] = String(r[i]||'').trim(); });
+        return obj;
+      });
+
+      const get = (r, ...keys) => {
+        for (const k of keys) {
+          const found = Object.keys(r).find(rk => rk.toLowerCase().includes(k.toLowerCase()));
+          if (found && r[found] && r[found] !== '' && r[found] !== 'nan') return r[found];
+        }
+        return '';
+      };
+
+      // Encontra índice das colunas Entrada e Saída para fallback por posição
+      const idxEntrada = headers.findIndex(h => h.toLowerCase().includes('entrada'));
+      const idxSaida   = headers.findIndex(h => h.toLowerCase().replace('í','i').includes('saida') || h.toLowerCase().includes('saída'));
+
+      let adicionados = 0;
+      rows.forEach((r, rowIdx) => {
+        const desc = get(r, 'descrição', 'descricao do produto', 'descricao', 'produto');
+        if (!desc || desc.length < 2 || desc.includes('▼')) return;
+
+        // Tenta ler ICMS pelo nome da coluna, com fallback pelo índice
+        const rawRow = dataRows[rowIdx] || [];
+        let icmsE = get(r, 'entrada') || (idxEntrada >= 0 ? String(rawRow[idxEntrada]||'') : '');
+        let icmsS = get(r, 'saída', 'saida') || (idxSaida >= 0 ? String(rawRow[idxSaida]||'') : '');
+        icmsE = icmsE.replace('%','').replace('nan','').trim();
+        icmsS = icmsS.replace('%','').replace('nan','').trim();
+
+        fila.push({
+          fornecedor_nome:  document.getElementById('forn-nome').value || 'Fornecedor',
+          fornecedor_email: document.getElementById('forn-email').value || '',
+          cod_ref:          get(r, 'código ref', 'codigo ref', 'ref', 'codigo'),
+          ean:              get(r, 'ean', 'codigo de barras', 'barras'),
+          dun:              get(r, 'dun'),
+          unid_cx:          get(r, 'unid. cx', 'unid cx', 'unidade', 'cx'),
+          descricao_produto: desc.toUpperCase(),
+          gramagem:         get(r, 'gramagem', 'gram', 'peso', 'volume'),
+          custo:            parseFloat(get(r, 'custo').replace(',','.').replace('R$','').trim()) || null,
+          venda:            parseFloat(get(r, 'venda', 'preco').replace(',','.').replace('R$','').trim()) || null,
+          ncm:              get(r, 'ncm'),
+          cest:             get(r, 'cest'),
+          icms_entrada:     icmsE,
+          icms_saida:       icmsS,
+        });
+        adicionados++;
+      });
+
+      renderFila();
+      document.getElementById('planilha-status').innerHTML =
+        `<div class="alert alert-green"><span class="alert-icon">✅</span>${adicionados} produtos importados da planilha.</div>`;
+      toast(`✅ ${adicionados} produtos adicionados`);
+    } catch(ex) {
+      document.getElementById('planilha-status').innerHTML =
+        `<div class="alert alert-red"><span class="alert-icon">❌</span>Erro ao ler planilha: ${ex.message}</div>`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── FORMULÁRIO MANUAL ─────────────────────────────────────────
+function fmtNcm(el) {
+  let v = el.value.replace(/[^0-9]/g, '');
+  if (v.length >= 4) v = v.substring(0,4) + '.' + v.substring(4);
+  if (v.length >= 7) v = v.substring(0,7) + '.' + v.substring(7);
+  el.value = v.substring(0, 12);
+}
+
+function adicionarProduto() {
+  const desc = document.getElementById('p-desc').value.trim().toUpperCase();
+  const nome = document.getElementById('forn-nome').value.trim();
+  if (!desc) { toast('⚠️ Preencha a descrição do produto'); return; }
+  if (!nome) { toast('⚠️ Preencha o nome do fornecedor'); return; }
+
+  fila.push({
+    fornecedor_nome: nome,
+    fornecedor_email: document.getElementById('forn-email').value.trim(),
+    cod_ref: document.getElementById('p-ref').value.trim(),
+    ean: document.getElementById('p-ean').value.trim(),
+    dun: document.getElementById('p-dun').value.trim(),
+    unid_cx: document.getElementById('p-unidcx').value.trim(),
+    descricao_produto: desc,
+    gramagem: document.getElementById('p-gram').value.trim(),
+    custo: parseFloat(document.getElementById('p-custo').value) || null,
+    venda: parseFloat(document.getElementById('p-venda').value) || null,
+    ncm: document.getElementById('p-ncm').value.trim(),
+    icms_entrada: document.getElementById('p-icms-entrada').value.trim(),
+    icms_saida: document.getElementById('p-icms-saida').value.trim(),
+    cest: '',
+  });
+
+  // Limpar campos do produto (mantém fornecedor)
+  ['p-desc','p-ean','p-dun','p-unidcx','p-ref','p-gram','p-marca','p-custo','p-venda','p-ncm','p-icms-entrada','p-icms-saida'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+
+  renderFila();
+  document.getElementById('p-desc').focus();
+  toast('✅ Produto adicionado à lista');
+}
+
+function renderFila() {
+  const card = document.getElementById('fila-card');
+  card.style.display = fila.length ? 'block' : 'none';
+  document.getElementById('fila-count').textContent = fila.length;
+  document.getElementById('fila-list').innerHTML = fila.map((item, i) => `
+    <div class="fila-item">
+      <div class="fila-num">${i + 1}</div>
+      <div class="fila-body">
+        <div class="fila-desc">${item.descricao_produto}</div>
+        <div class="fila-meta">
+          ${item.cod_ref ? `Ref: ${item.cod_ref} · ` : ''}
+          ${item.ean ? `EAN: ${item.ean} · ` : ''}
+          ${item.gramagem ? `${item.gramagem} · ` : ''}
+          ${item.custo ? `Custo: R$ ${Number(item.custo).toFixed(2)}` : ''}
+          ${item.icms_entrada ? ` · Ent: ${item.icms_entrada}%` : ''}
+          ${item.icms_saida ? ` · Saí: ${item.icms_saida}%` : ''}
+        </div>
+        <div class="fila-tags">
+          ${item.ncm ? `<span class="tag tag-green">NCM ${item.ncm}</span>` : '<span class="tag tag-gray">Sem NCM</span>'}
+          ${item.ean ? `<span class="tag tag-green">EAN ✓</span>` : '<span class="tag tag-gray">Sem EAN</span>'}
+          ${item.icms_entrada ? `<span class="tag" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe">Ent: ${item.icms_entrada}%</span>` : ''}
+          ${item.icms_saida ? `<span class="tag" style="background:#eff6ff;color:#3b82f6;border:1px solid #bfdbfe">Saí: ${item.icms_saida}%</span>` : ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn btn-sm btn-outline" onclick="editarItemFila(${i})" title="Editar">✏️</button>
+        <button class="btn btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #fca5a5" onclick="removerItem(${i})">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function editarItemFila(i) {
+  const item = fila[i];
+  window._portalEditIdx = i;
+
+  // Preenche modal de edição
+  document.getElementById('pe-idx').value = i;
+  document.getElementById('pe-desc').value = item.descricao_produto || '';
+  document.getElementById('pe-ean').value = item.ean || '';
+  document.getElementById('pe-ref').value = item.cod_ref || '';
+  document.getElementById('pe-gram').value = item.gramagem || '';
+  document.getElementById('pe-custo').value = item.custo || '';
+  document.getElementById('pe-venda').value = item.venda || '';
+  document.getElementById('pe-ncm').value = item.ncm || '';
+  document.getElementById('pe-icms-e').value = item.icms_entrada || '';
+  document.getElementById('pe-icms-s').value = item.icms_saida || '';
+  document.getElementById('portal-edit-modal').style.display = 'flex';
+}
+
+function salvarItemFila() {
+  const i = parseInt(document.getElementById('pe-idx').value);
+  if (isNaN(i)) return;
+  fila[i] = {
+    ...fila[i],
+    descricao_produto: document.getElementById('pe-desc').value.trim().toUpperCase(),
+    ean:               document.getElementById('pe-ean').value.trim(),
+    cod_ref:           document.getElementById('pe-ref').value.trim(),
+    gramagem:          document.getElementById('pe-gram').value.trim(),
+    custo:             parseFloat(document.getElementById('pe-custo').value) || null,
+    venda:             parseFloat(document.getElementById('pe-venda').value) || null,
+    ncm:               document.getElementById('pe-ncm').value.trim(),
+    icms_entrada:      document.getElementById('pe-icms-e').value.trim(),
+    icms_saida:        document.getElementById('pe-icms-s').value.trim(),
+  };
+  fecharEditPortal();
+  renderFila();
+  toast('✅ Produto atualizado');
+}
+
+function fecharEditPortal() {
+  document.getElementById('portal-edit-modal').style.display = 'none';
+}
+
+function removerItem(i) {
+  fila.splice(i, 1);
+  renderFila();
+}
+
+function limparFila() {
+  if (!confirm('Limpar toda a lista?')) return;
+  fila = [];
+  renderFila();
+}
+
+// ── ENVIAR ────────────────────────────────────────────────────
+async function enviarTudo() {
+  const nome = document.getElementById('forn-nome').value.trim();
+  if (!nome) { toast('⚠️ Preencha o nome do fornecedor'); return; }
+  if (!fila.length) { toast('⚠️ Adicione pelo menos um produto'); return; }
+  if (!sbClient) { toast('❌ Conexão não configurada'); return; }
+
+  const btn = document.getElementById('btn-enviar');
+  const prog = document.getElementById('envio-progress');
+  const bar = document.getElementById('envio-bar');
+  const lbl = document.getElementById('envio-label');
+
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+  prog.style.display = 'block';
+
+  let enviados = 0;
+  const total = fila.length;
+
+  try {
+    for (let i = 0; i < fila.length; i++) {
+      const { error } = await sbClient.from('solicitacoes_fornecedor').insert(fila[i]);
+      if (error) throw error;
+      enviados++;
+      const pct = Math.round(enviados / total * 100);
+      bar.style.width = pct + '%';
+      lbl.textContent = `Enviando ${enviados} de ${total}...`;
+    }
+
+    // Sucesso
+    localStorage.setItem('forn_nome', nome);
+    localStorage.setItem('forn_email', document.getElementById('forn-email').value.trim());
+    fila = [];
+    document.getElementById('form-section').style.display = 'none';
+    document.getElementById('success-screen').style.display = 'block';
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '🚀 Enviar para aprovação da Thalia';
+    prog.style.display = 'none';
+    toast('❌ Erro ao enviar: ' + e.message);
+    console.error(e);
+  }
+}
+
+function resetForm() {
+  document.getElementById('form-section').style.display = 'block';
+  document.getElementById('success-screen').style.display = 'none';
+  document.getElementById('btn-enviar').disabled = false;
+  document.getElementById('btn-enviar').textContent = '🚀 Enviar para aprovação da Thalia';
+  document.getElementById('envio-progress').style.display = 'none';
+  renderFila();
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
