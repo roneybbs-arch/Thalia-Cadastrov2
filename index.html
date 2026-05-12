@@ -1144,19 +1144,36 @@ tr:hover td{background:var(--green-light)}
 
   <!-- CONFIG TOKEN -->
   <div class="card" style="margin-bottom:20px;padding:18px 24px" id="cosmos-config-card">
-    <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">
-      <div style="flex:1;min-width:260px">
-        <label style="font-size:11px;font-weight:600;color:var(--text-2);letter-spacing:.3px;text-transform:uppercase;display:block;margin-bottom:6px">Token da API Cosmos (X-Cosmos-Token)</label>
-        <input type="text" id="cosmos-token" placeholder="pcgwjFpXRT18r5RW0_caUg" style="font-family:monospace;font-size:13px">
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:14px">⚙️ Configuração das fontes de dados</div>
+
+    <!-- Linha 1: Cosmos -->
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:200px">
+        <label style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:5px">🔵 Token Cosmos Bluesoft <small style="color:var(--text-3);font-weight:400">(25/dia grátis)</small></label>
+        <input type="text" id="cosmos-token" placeholder="pcgwjFpXRT18r5RW0_caUg" style="font-family:monospace;font-size:12px">
       </div>
-      <div style="flex:1;min-width:260px" id="cosmos-proxy-field">
-        <label style="font-size:11px;font-weight:600;color:var(--text-2);letter-spacing:.3px;text-transform:uppercase;display:block;margin-bottom:6px">URL do Proxy Cloudflare Worker</label>
-        <input type="text" id="cosmos-proxy-url" placeholder="https://cosmos-proxy.SEU-USUARIO.workers.dev/cosmos" style="font-family:monospace;font-size:12px">
+      <div style="flex:1;min-width:240px" id="cosmos-proxy-field">
+        <label style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:5px">☁️ URL do Proxy Cloudflare</label>
+        <input type="text" id="cosmos-proxy-url" placeholder="https://cosmos-proxy.roneybbs.workers.dev/cosmos" style="font-family:monospace;font-size:11px">
       </div>
-      <button class="btn btn-primary" onclick="saveCosmosToken()">💾 Salvar</button>
-      <div style="font-size:12px;color:var(--text-3)">
-        Token em <a href="https://cosmos.bluesoft.com.br/api" target="_blank" style="color:var(--green)">cosmos.bluesoft.com.br/api</a>
+    </div>
+
+    <!-- Linha 2: DotCompany + RSC -->
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
+      <div style="flex:1;min-width:200px">
+        <label style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:5px">🟢 DotCompany <small style="color:var(--text-3);font-weight:400">(50/dia grátis — automático)</small></label>
+        <div style="padding:8px 12px;background:var(--green-light);border:1px solid var(--green-mid);border-radius:8px;font-size:12px;color:var(--green-dark)">✅ Ativado automaticamente — sem configuração necessária</div>
       </div>
+      <div style="flex:1;min-width:200px">
+        <label style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:5px">🟡 RSC Sistemas <small style="color:var(--text-3);font-weight:400">(grátis — cadastre em gtin.rscsistemas.com.br)</small></label>
+        <input type="text" id="rsc-creds" placeholder="usuário:senha (base64 ou texto puro)" style="font-family:monospace;font-size:12px">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-primary" onclick="saveCosmosToken()">💾 Salvar configurações</button>
+      <a href="https://gtin.rscsistemas.com.br/cadastro" target="_blank" class="btn btn-outline btn-sm">📝 Cadastrar RSC grátis</a>
+      <a href="https://cosmos.bluesoft.com.br/api" target="_blank" class="btn btn-outline btn-sm">🔑 Token Cosmos</a>
     </div>
     <div id="cosmos-token-status" style="margin-top:10px"></div>
   </div>
@@ -3813,13 +3830,21 @@ onLoginSuccess = function() {
 // ============================================================
 // COSMOS BLUESOFT — COMPARATIVO
 // ============================================================
-const COSMOS_TOKEN_KEY = 'thalia_cosmos_token';
+const COSMOS_TOKEN_KEY   = 'thalia_cosmos_token';
 const COSMOS_TOKEN_PROXY_KEY = 'thalia_cosmos_proxy';
-// Se estiver no GitHub Pages usa o proxy Cloudflare, senão chama direto
+const RSC_CREDS_KEY      = 'thalia_rsc_creds';
+let   rscToken           = null;
+let   rscTokenExp        = 0;
+
 const IS_GITHUB = location.hostname.includes('github.io') || location.hostname.includes('github.com');
-let COSMOS_API = IS_GITHUB
-  ? (localStorage.getItem(COSMOS_TOKEN_PROXY_KEY) || 'https://SEU-WORKER.workers.dev/cosmos')
+let COSMOS_API  = IS_GITHUB
+  ? (localStorage.getItem(COSMOS_TOKEN_PROXY_KEY) || 'https://cosmos-proxy.roneybbs.workers.dev/cosmos')
   : 'https://api.cosmos.bluesoft.com.br';
+
+function getProxyBase() {
+  const p = localStorage.getItem(COSMOS_TOKEN_PROXY_KEY) || 'https://cosmos-proxy.roneybbs.workers.dev/cosmos';
+  return p.replace(/\/cosmos\/?$/, '');
+}
 let cosmosResults = [];
 let cosmosMode = 'lote';
 let cosmosFilter = '';
@@ -3830,34 +3855,35 @@ let cosmosStop = false;
 const COSMOS_PER_PAGE = 50;
 
 function initCosmos() {
-  const token = localStorage.getItem(COSMOS_TOKEN_KEY) || '';
-  document.getElementById('cosmos-token').value = token;
+  const token    = localStorage.getItem(COSMOS_TOKEN_KEY) || '';
+  const proxyUrl = localStorage.getItem(COSMOS_TOKEN_PROXY_KEY) || '';
+  const rscCreds = localStorage.getItem(RSC_CREDS_KEY) || '';
 
-  // Show/hide proxy field based on environment
-  const proxyField = document.getElementById('cosmos-proxy-field');
-  if (IS_GITHUB) {
-    proxyField.style.display = 'block';
-    const savedProxy = localStorage.getItem(COSMOS_TOKEN_PROXY_KEY) || '';
-    document.getElementById('cosmos-proxy-url').value = savedProxy;
-    if (!savedProxy) {
-      document.getElementById('cosmos-token-status').innerHTML =
-        `<div class="alert alert-yellow"><span class="alert-icon">⚠️</span>Você está no GitHub Pages — preencha também a URL do Proxy Cloudflare para o Cosmos funcionar.</div>`;
-    }
-  } else {
-    proxyField.style.display = 'none';
-  }
+  if (document.getElementById('cosmos-token'))     document.getElementById('cosmos-token').value = token;
+  if (document.getElementById('cosmos-proxy-url')) document.getElementById('cosmos-proxy-url').value = proxyUrl;
+  if (document.getElementById('rsc-creds'))        document.getElementById('rsc-creds').value = rscCreds ? '(salvo)' : '';
 
-  if (token) {
+  // Show/hide proxy field
+  const pf = document.getElementById('cosmos-proxy-field');
+  if (pf) pf.style.display = IS_GITHUB ? 'block' : 'none';
+
+  if (token || rscCreds) {
+    const fontes = ['DotCompany'];
+    if (token) fontes.unshift('Cosmos');
+    if (rscCreds) fontes.push('RSC Sistemas');
     document.getElementById('cosmos-token-status').innerHTML =
-      `<div class="alert alert-green" style="display:inline-flex"><span class="alert-icon">✅</span>Token configurado${IS_GITHUB ? ' — configure também o Proxy abaixo' : ''}.</div>`;
+      `<div class="alert alert-green" style="display:inline-flex"><span class="alert-icon">✅</span>Fontes ativas: <strong style="margin-left:4px">${fontes.join(' + ')}</strong></div>`;
+  } else if (IS_GITHUB && !proxyUrl) {
+    document.getElementById('cosmos-token-status').innerHTML =
+      `<div class="alert alert-yellow"><span class="alert-icon">⚠️</span>Configure o Proxy Cloudflare para usar no GitHub Pages.</div>`;
   }
+
   if (erpData.length) {
     const comEan = erpData.filter(r => r.CODIGO_BARRAS && r.CODIGO_BARRAS.length >= 7 && r.CODIGO_BARRAS !== '0' && r.CODIGO_BARRAS !== 'nan');
     const ativos = comEan.filter(r => r.DESCRICAO_STATUS_COMPRA === 'Ativo');
     document.getElementById('cosmos-lote-info').textContent =
       `${ativos.length.toLocaleString('pt-BR')} produtos ativos com EAN disponíveis para consulta.`;
   }
-  // Auto-carrega cache do banco ao abrir a aba (se ainda não carregou)
   if (cosmosResults.length === 0 && sbClient && currentUser) {
     carregarCacheSupabase();
   } else if (cosmosResults.length) {
@@ -3866,26 +3892,31 @@ function initCosmos() {
 }
 
 function saveCosmosToken() {
-  const token = document.getElementById('cosmos-token').value.trim();
-  if (!token) { toast('⚠️ Preencha o token', 'error'); return; }
-  localStorage.setItem(COSMOS_TOKEN_KEY, token);
+  const token    = document.getElementById('cosmos-token').value.trim();
+  const proxyUrl = document.getElementById('cosmos-proxy-url')?.value.trim() || '';
+  const rscRaw   = document.getElementById('rsc-creds')?.value.trim() || '';
 
-  if (IS_GITHUB) {
-    const proxyUrl = document.getElementById('cosmos-proxy-url').value.trim();
-    if (proxyUrl) {
-      localStorage.setItem(COSMOS_TOKEN_PROXY_KEY, proxyUrl);
-      COSMOS_API = proxyUrl;
-      document.getElementById('cosmos-token-status').innerHTML =
-        `<div class="alert alert-green" style="display:inline-flex"><span class="alert-icon">✅</span>Token e Proxy salvos! Cosmos pronto para uso.</div>`;
-    } else {
-      document.getElementById('cosmos-token-status').innerHTML =
-        `<div class="alert alert-yellow"><span class="alert-icon">⚠️</span>Token salvo, mas URL do Proxy não preenchida. O Cosmos não funcionará no GitHub Pages sem o proxy.</div>`;
-    }
-  } else {
-    document.getElementById('cosmos-token-status').innerHTML =
-      `<div class="alert alert-green" style="display:inline-flex"><span class="alert-icon">✅</span>Token salvo!</div>`;
+  if (token) localStorage.setItem(COSMOS_TOKEN_KEY, token);
+  if (proxyUrl) {
+    localStorage.setItem(COSMOS_TOKEN_PROXY_KEY, proxyUrl);
+    COSMOS_API = proxyUrl;
   }
-  toast('✅ Configurações do Cosmos salvas', 'success');
+  if (rscRaw) {
+    // Aceita "user:pass" (texto puro) ou já em base64
+    const isBase64 = /^[A-Za-z0-9+/]+=*$/.test(rscRaw) && rscRaw.length > 20;
+    const creds = isBase64 ? rscRaw : btoa(rscRaw);
+    localStorage.setItem(RSC_CREDS_KEY, creds);
+    rscToken = null; // força renovação do token
+  }
+
+  const fontes = [];
+  if (token) fontes.push('Cosmos');
+  fontes.push('DotCompany');
+  if (rscRaw) fontes.push('RSC Sistemas');
+
+  document.getElementById('cosmos-token-status').innerHTML =
+    `<div class="alert alert-green" style="display:inline-flex"><span class="alert-icon">✅</span>Configurado! Fontes ativas: <strong style="margin-left:4px">${fontes.join(' + ')}</strong> — ~${25*(token?1:0)+50+20*(rscRaw?1:0)} consultas/dia grátis.</div>`;
+  toast('✅ Configurações salvas', 'success');
 }
 
 function setCosmosMode(mode) {
@@ -3905,29 +3936,60 @@ function setCosmosSt(btn) {
   cosmosStatusFilter = btn.getAttribute('data-val');
 }
 
-async function fetchCosmos(ean) {
+async function fetchCosmosAPI(ean) {
   const token = localStorage.getItem(COSMOS_TOKEN_KEY);
-  if (!token) throw new Error('Token não configurado');
-
+  if (!token) return null;
   const url = `${COSMOS_API}/gtins/${ean}.json`;
-
-  // Tenta até 3 vezes com espera progressiva em caso de 429
-  for (let tentativa = 1; tentativa <= 3; tentativa++) {
-    const resp = await fetch(url, {
-      headers: { 'X-Cosmos-Token': token, 'User-Agent': 'Cosmos-API-Request' }
-    });
+  for (let t = 1; t <= 2; t++) {
+    const resp = await fetch(url, { headers: { 'X-Cosmos-Token': token, 'User-Agent': 'Cosmos-API-Request' } });
     if (resp.status === 404) return null;
     if (resp.status === 429) {
-      if (tentativa < 3) {
-        // Espera 5s antes de tentar novamente
-        await new Promise(r => setTimeout(r, 5000 * tentativa));
-        continue;
-      }
-      throw new Error('Limite de requisições da API atingido (429). Tente novamente em alguns minutos.');
+      if (t < 2) { await new Promise(r => setTimeout(r, 5000)); continue; }
+      throw new Error('LIMITE_429');
     }
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    return resp.json();
+    if (!resp.ok) return null;
+    const d = await resp.json();
+    return d ? { ...d, _fonte: 'Cosmos' } : null;
   }
+}
+
+async function fetchDotCompany(ean) {
+  try {
+    const resp = await fetch(`${getProxyBase()}/dotcompany/${ean}`, { headers: { 'Accept': 'application/json' } });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    if (!data?.sucesso || !data?.produto) return null;
+    const p = data.produto;
+    return { description: p.nome||'', ncm: p.ncm?{code:String(p.ncm),description:''}:null, brand: p.marca?{name:p.marca}:null, thumbnail: p.imagem_url||null, _fonte: 'DotCompany' };
+  } catch(e) { return null; }
+}
+
+async function fetchRSC(ean) {
+  const creds = localStorage.getItem(RSC_CREDS_KEY);
+  if (!creds) return null;
+  try {
+    if (!rscToken || Date.now() > rscTokenExp) {
+      const tr = await fetch(`${getProxyBase()}/rsc/token`, { method:'POST', headers:{'X-RSC-Credentials':creds,'Accept':'application/json'} });
+      if (!tr.ok) return null;
+      const td = await tr.json();
+      rscToken = td.token; rscTokenExp = Date.now() + 55*60*1000;
+    }
+    const resp = await fetch(`${getProxyBase()}/rsc/gtin/${ean}`, { headers: {'X-RSC-Token':rscToken,'Accept':'application/json'} });
+    if (!resp.ok) return null;
+    const p = await resp.json();
+    if (!p?.nome) return null;
+    return { description: p.nome||'', ncm: p.ncm?{code:String(p.ncm).padStart(8,'0'),description:''}:null, brand: p.marca?{name:p.marca}:null, thumbnail:null, _fonte:'RSC Sistemas' };
+  } catch(e) { return null; }
+}
+
+async function fetchCosmos(ean) {
+  // Cascata: Cosmos → DotCompany → RSC
+  const cosmos = await fetchCosmosAPI(ean);
+  if (cosmos) return cosmos;
+  const dot = await fetchDotCompany(ean);
+  if (dot) return dot;
+  const rsc = await fetchRSC(ean);
+  return rsc;
 }
 
 async function iniciarLote() {
@@ -3994,7 +4056,7 @@ async function iniciarLote() {
     } catch(e) {
       result = buildCosmosResult(prod, null, e.message);
       erros++;
-      if (e.message.includes('429') || e.message.includes('Limite')) {
+      if (e.message === 'LIMITE_429') {
         cosmosResults.push(result);
         cosmosStop = true;
         document.getElementById('cosmos-prog-label').textContent = '⏸ Limite atingido — resultados salvos. Troque o token ou aguarde 1h e continue.';
