@@ -4015,8 +4015,8 @@ function saveFonteToggles() {
   localStorage.setItem('thalia_use_rsc', document.getElementById('toggle-rsc').checked ? '1' : '0');
 }
 
-function useDot() { return localStorage.getItem('thalia_use_dot') !== '0'; }
-function useRSC() { return localStorage.getItem('thalia_use_rsc') !== '0'; }
+function useDot() { return localStorage.getItem('thalia_use_dot') === '1'; }
+function useRSC() { return localStorage.getItem('thalia_use_rsc') === '1'; }
 
 async function fetchCosmos(ean) {
   // 1. Tenta Cosmos (sempre)
@@ -4076,16 +4076,7 @@ async function iniciarLote() {
     } catch(e) { console.warn('Erro cache:', e); }
   }
 
-  const pendentes = base.filter(r => {
-    // Já consultado e encontrado → pula
-    if (jaConsultados.has(r.PRODUTO) || jaConsultados.has(r.CODIGO_BARRAS)) {
-      // Mas se estava como "não encontrado", tenta novamente (pode ter crédito novo)
-      const cached = cosmosResults.find(x => x.prod.PRODUTO === r.PRODUTO);
-      if (cached && cached.status === 'nao_encontrado') return true;
-      return false;
-    }
-    return true;
-  });
+  const pendentes = base.filter(r => !jaConsultados.has(r.PRODUTO) && !jaConsultados.has(r.CODIGO_BARRAS));
   const lista = limit > 0 ? pendentes.slice(0, limit) : pendentes;
 
   if (!lista.length) {
