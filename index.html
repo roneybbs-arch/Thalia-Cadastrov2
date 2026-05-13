@@ -1217,9 +1217,11 @@ tr:hover td{background:var(--green-light)}
             <button class="btn btn-outline" id="cosmos-stop-btn" onclick="pararLote()" style="display:none">⏹ Parar</button>
           </div>
         </div>
-        <div style="margin-left:auto;display:flex;gap:8px">
+        <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-outline btn-sm" onclick="carregarCacheSupabase()">☁️ Carregar do banco</button>
-          <button class="btn btn-outline btn-sm" onclick="exportarCosmos()">⬇️ Exportar comparativo</button>
+          <button class="btn btn-outline btn-sm" onclick="exportarCosmos('pendente')" title="Exportar apenas os que ainda não foram revisados">⬇️ Exportar pendentes</button>
+          <button class="btn btn-outline btn-sm" onclick="exportarCosmos('revisado')" title="Exportar apenas os já revisados">✅ Exportar revisados</button>
+          <button class="btn btn-outline btn-sm" onclick="exportarCosmos('')">📋 Exportar tudo</button>
         </div>
       </div>
 
@@ -1235,21 +1237,51 @@ tr:hover td{background:var(--green-light)}
     </div>
 
     <!-- KPIs resultado -->
-    <div class="grid-4" style="margin-bottom:16px" id="cosmos-kpis" style="display:none">
+    <div class="grid-4" style="margin-bottom:12px" id="cosmos-kpis">
       <div class="stat-card"><div class="stat-value" id="ck-total">—</div><div class="stat-label">Consultados</div></div>
       <div class="stat-card"><div class="stat-value" style="color:var(--red)" id="ck-ncm">—</div><div class="stat-label">NCM divergente</div></div>
       <div class="stat-card"><div class="stat-value" style="color:var(--yellow)" id="ck-desc">—</div><div class="stat-label">Descrição diferente</div></div>
       <div class="stat-card"><div class="stat-value" style="color:var(--green)" id="ck-ok">—</div><div class="stat-label">Sem divergência</div></div>
     </div>
+    <!-- KPIs revisão -->
+    <div id="cosmos-revisao-kpis" style="display:none;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Progresso de revisão</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:100px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;text-align:center;cursor:pointer" onclick="setRevisaoFilter('pendente')">
+          <div style="font-size:20px;font-weight:700;color:var(--text)" id="ck-rev-pendente">—</div>
+          <div style="font-size:11px;color:var(--text-3)">⬜ Pendente</div>
+        </div>
+        <div style="flex:1;min-width:100px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;text-align:center;cursor:pointer" onclick="setRevisaoFilter('andamento')">
+          <div style="font-size:20px;font-weight:700;color:var(--yellow)" id="ck-rev-andamento">—</div>
+          <div style="font-size:11px;color:var(--text-3)">🔄 Em andamento</div>
+        </div>
+        <div style="flex:1;min-width:100px;background:var(--green-light);border:1px solid var(--green-mid);border-radius:8px;padding:10px 14px;text-align:center;cursor:pointer" onclick="setRevisaoFilter('revisado')">
+          <div style="font-size:20px;font-weight:700;color:var(--green-dark)" id="ck-rev-revisado">—</div>
+          <div style="font-size:11px;color:var(--text-3)">✅ Revisado</div>
+        </div>
+        <div style="flex:2;min-width:160px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;flex-direction:column;justify-content:center">
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:4px">Progresso geral</div>
+          <div class="progress-bar" style="height:8px"><div class="progress-fill" id="cosmos-rev-bar" style="width:0%"></div></div>
+          <div style="font-size:11px;color:var(--text-2);margin-top:4px" id="cosmos-rev-pct">0% revisado</div>
+        </div>
+      </div>
+    </div>
 
     <!-- Filtros tabela -->
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center" id="cosmos-filtros" style="display:none">
-      <div style="display:flex;gap:4px" id="cosmos-tipo-btns">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center" id="cosmos-filtros">
+      <div style="display:flex;gap:4px;flex-wrap:wrap" id="cosmos-tipo-btns">
         <button class="chip on" data-val="" onclick="setCosmosFilter(this)">Todos</button>
         <button class="chip" data-val="ncm_div" onclick="setCosmosFilter(this)" style="border-color:#e53e3e;color:#e53e3e">NCM divergente</button>
         <button class="chip" data-val="desc_div" onclick="setCosmosFilter(this)" style="border-color:var(--yellow);color:var(--yellow)">Descrição diferente</button>
         <button class="chip" data-val="nao_encontrado" onclick="setCosmosFilter(this)" style="border-color:var(--text-3)">Não encontrado</button>
         <button class="chip" data-val="ok" onclick="setCosmosFilter(this)" style="border-color:var(--green);color:var(--green)">Sem divergência</button>
+      </div>
+      <div style="width:1px;height:20px;background:var(--border)"></div>
+      <div style="display:flex;gap:4px" id="cosmos-rev-btns">
+        <button class="chip on" data-rev="" onclick="setRevisaoFilter('')">Todos</button>
+        <button class="chip" data-rev="pendente" onclick="setRevisaoFilter('pendente')">⬜ Pendente</button>
+        <button class="chip" data-rev="andamento" onclick="setRevisaoFilter('andamento')" style="border-color:var(--yellow);color:var(--yellow)">🔄 Andamento</button>
+        <button class="chip" data-rev="revisado" onclick="setRevisaoFilter('revisado')" style="border-color:var(--green);color:var(--green)">✅ Revisado</button>
       </div>
       <input type="text" id="cosmos-search-filter" placeholder="Buscar..." oninput="renderCosmosTable()" style="flex:1;max-width:260px;font-size:13px">
       <span style="font-size:12px;color:var(--text-3)" id="cosmos-filter-count"></span>
@@ -1269,6 +1301,7 @@ tr:hover td{background:var(--green-light)}
             <th>NCM Cosmos</th>
             <th>Marca</th>
             <th>Divergências</th>
+            <th style="width:130px">Revisão</th>
           </tr>
         </thead>
         <tbody id="cosmos-table-body"></tbody>
@@ -3835,6 +3868,7 @@ function getProxyBase() {
 let cosmosResults = [];
 let cosmosMode = 'lote';
 let cosmosFilter = '';
+let cosmosRevisaoFilter = '';
 let cosmosStatusFilter = 'Ativo';
 let cosmosPage = 1;
 let cosmosRunning = false;
@@ -3897,14 +3931,9 @@ function saveCosmosToken() {
     rscToken = null; // força renovação do token
   }
 
-  const fontes = [];
-  if (token) fontes.push('Cosmos');
-  fontes.push('DotCompany');
-  if (rscRaw) fontes.push('RSC Sistemas');
-
   document.getElementById('cosmos-token-status').innerHTML =
-    `<div class="alert alert-green" style="display:inline-flex"><span class="alert-icon">✅</span>Configurado! Fontes ativas: <strong style="margin-left:4px">${fontes.join(' + ')}</strong> — ~${25*(token?1:0)+50+20*(rscRaw?1:0)} consultas/dia grátis.</div>`;
-  toast('✅ Configurações salvas', 'success');
+    `<div class="alert alert-green" style="display:inline-flex"><span class="alert-icon">✅</span>Token salvo! Cosmos configurado — 25 consultas/dia grátis.</div>`;
+  toast('✅ Token salvo', 'success');
 }
 
 function setCosmosMode(mode) {
@@ -4066,6 +4095,7 @@ async function iniciarLote() {
           prod: { PRODUTO: r.produto_codigo, CODIGO_BARRAS: r.ean, DESCRICAO_PRODUTO: r.descricao_thalia, NCM: r.ncm_thalia, DESCRICAO_MARCA: r.marca_thalia, DESCRICAO_STATUS_COMPRA: 'Ativo' },
           cosmos: r.descricao_cosmos ? { description: r.descricao_cosmos, ncm: { code: r.ncm_cosmos }, brand: { name: r.marca_cosmos }, thumbnail: r.thumbnail } : null,
           status: r.status, divergencias: r.divergencias || [],
+          _revisao: r.revisao_status || 'pendente',
           erro: r.status === 'nao_encontrado' ? 'Não encontrado' : null
         }));
         fromCache.forEach(c => { if (!cosmosResults.find(x => x.prod.PRODUTO === c.prod.PRODUTO)) cosmosResults.push(c); });
@@ -4175,6 +4205,7 @@ async function carregarCacheSupabase() {
       } : null,
       status: r.status,
       divergencias: r.divergencias || [],
+      _revisao: r.revisao_status || 'pendente',
       erro: r.status === 'nao_encontrado' ? 'Não encontrado' : null
     }));
 
@@ -4230,6 +4261,29 @@ function renderCosmosKpis() {
   setText('ck-ncm',  cosmosResults.filter(r=>r.status==='ncm_div').length.toLocaleString('pt-BR'));
   setText('ck-desc', cosmosResults.filter(r=>r.status==='desc_div').length.toLocaleString('pt-BR'));
   setText('ck-ok',   cosmosResults.filter(r=>r.status==='ok').length.toLocaleString('pt-BR'));
+
+  // KPIs de revisão
+  const comDiv = cosmosResults.filter(r => r.status==='ncm_div' || r.status==='desc_div');
+  if (comDiv.length > 0) {
+    const pendente  = comDiv.filter(r => !r._revisao || r._revisao==='pendente').length;
+    const andamento = comDiv.filter(r => r._revisao==='andamento').length;
+    const revisado  = comDiv.filter(r => r._revisao==='revisado').length;
+    const pct = Math.round(revisado / comDiv.length * 100);
+    setText('ck-rev-pendente',  pendente.toLocaleString('pt-BR'));
+    setText('ck-rev-andamento', andamento.toLocaleString('pt-BR'));
+    setText('ck-rev-revisado',  revisado.toLocaleString('pt-BR'));
+    document.getElementById('cosmos-rev-bar').style.width = pct + '%';
+    setText('cosmos-rev-pct', `${pct}% revisado — ${revisado} de ${comDiv.length} com divergência`);
+    document.getElementById('cosmos-revisao-kpis').style.display = '';
+  }
+}
+
+function setRevisaoFilter(val) {
+  cosmosRevisaoFilter = val;
+  cosmosPage = 1;
+  document.querySelectorAll('#cosmos-rev-btns .chip').forEach(b =>
+    b.classList.toggle('on', b.getAttribute('data-rev') === val));
+  renderCosmosTable();
 }
 
 function setCosmosFilter(btn) {
@@ -4244,6 +4298,10 @@ function getCosmosFiltered() {
   const q = (document.getElementById('cosmos-search-filter')?.value||'').toLowerCase();
   return cosmosResults.filter(r => {
     if (cosmosFilter && r.status !== cosmosFilter) return false;
+    if (cosmosRevisaoFilter) {
+      const rev = r._revisao || 'pendente';
+      if (rev !== cosmosRevisaoFilter) return false;
+    }
     if (q && !`${r.prod.PRODUTO} ${r.prod.DESCRICAO_PRODUTO} ${r.prod.CODIGO_BARRAS} ${r.cosmos?.description||''}`.toLowerCase().includes(q)) return false;
     return true;
   });
@@ -4284,7 +4342,16 @@ function renderCosmosTable() {
            onclick="openImgModal(this.dataset.url,this.dataset.desc,this.dataset.ean)">`
       : `<div class="cosmos-no-img">—</div>`;
 
-    return `<tr>
+    // Revisão
+    const rev = r._revisao || 'pendente';
+    const revBadge = {
+      pendente:  `<span style="font-size:11px;color:var(--text-3)">⬜ Pendente</span>`,
+      andamento: `<span style="font-size:11px;color:var(--yellow);font-weight:600">🔄 Andamento</span>`,
+      revisado:  `<span style="font-size:11px;color:var(--green-dark);font-weight:600">✅ Revisado</span>`,
+    };
+    const prodCode = r.prod.PRODUTO;
+
+    return `<tr style="${rev==='revisado'?'opacity:.65':''}">
       <td style="text-align:center;padding:6px 8px">${imgCell}</td>
       <td class="td-code">${r.prod.PRODUTO}</td>
       <td class="td-code">${r.prod.CODIGO_BARRAS}</td>
@@ -4293,12 +4360,23 @@ function renderCosmosTable() {
       <td class="td-code">${r.prod.NCM||'—'}</td>
       <td class="td-code" style="${ncmStyle}">${ncmC}</td>
       <td style="font-size:12px;line-height:1.4">${marcaMix}</td>
-      <td style="min-width:180px">${statusBadge[r.status]||''}${r.divergencias.length?`<div style="font-size:10px;color:var(--text-2);margin-top:3px;line-height:1.5">${r.divergencias.map(d=>'↳ '+d).join('<br>')}</div>`:''}</td>
+      <td style="min-width:160px">${statusBadge[r.status]||''}${r.divergencias.length?`<div style="font-size:10px;color:var(--text-2);margin-top:3px;line-height:1.5">${r.divergencias.map(d=>'↳ '+d).join('<br>')}</div>`:''}</td>
+      <td style="min-width:120px">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          ${revBadge[rev]||revBadge.pendente}
+          <select style="font-size:11px;padding:2px 4px;border-radius:4px;border:1px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer"
+            onchange="marcarRevisao('${prodCode}', this.value)">
+            <option value="pendente"  ${rev==='pendente' ?'selected':''}>⬜ Pendente</option>
+            <option value="andamento" ${rev==='andamento'?'selected':''}>🔄 Em andamento</option>
+            <option value="revisado"  ${rev==='revisado' ?'selected':''}>✅ Revisado</option>
+          </select>
+        </div>
+      </td>
     </tr>`;
   }).join('');
 
   if (!slice.length) document.getElementById('cosmos-table-body').innerHTML =
-    `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-3)">${cosmosResults.length?'Nenhum resultado com este filtro.':'Inicie uma consulta para ver os resultados.'}</td></tr>`;
+    `<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--text-3)">${cosmosResults.length?'Nenhum resultado com este filtro.':'Inicie uma consulta para ver os resultados.'}</td></tr>`;
 
   const pg = document.getElementById('cosmos-pagination');
   if (pages <= 1) { pg.innerHTML = ''; return; }
@@ -4506,17 +4584,59 @@ async function salvarEditCorr() {
   toast('✅ Cadastro editado e marcado como corrigido!', 'success');
 }
 
-function exportarCosmos() {
-  if (!cosmosResults.length) { toast('⚠️ Nenhum resultado para exportar', 'error'); return; }
-  const rows = cosmosResults.map(r => ({
-    PRODUTO: r.prod.PRODUTO, DESCRICAO_THALIA: r.prod.DESCRICAO_PRODUTO,
-    DESCRICAO_COSMOS: r.cosmos?.description||'', EAN: r.prod.CODIGO_BARRAS,
-    NCM_THALIA: r.prod.NCM, NCM_COSMOS: r.cosmos?.ncm?.code?fmtNcmStr(r.cosmos.ncm.code):'',
+async function marcarRevisao(prodCodigo, status) {
+  const r = cosmosResults.find(x => x.prod.PRODUTO === prodCodigo);
+  if (!r) return;
+  r._revisao = status;
+
+  // Salva no Supabase
+  if (sbClient && currentUser) {
+    try {
+      await sbClient.from('cosmos_cache').update({
+        revisao_status: status,
+        revisao_at: new Date().toISOString(),
+        revisao_por: currentUser.email
+      }).eq('produto_codigo', prodCodigo);
+    } catch(e) { console.warn('Erro ao salvar revisão:', e); }
+  }
+
+  renderCosmosKpis();
+  // Não re-renderiza a tabela inteira para não perder o foco do select
+}
+
+function exportarCosmos(filtroRevisao) {
+  // filtroRevisao: '' = tudo, 'pendente' = só pendentes, 'revisado' = só revisados
+  let dados = cosmosResults.filter(r => r.status === 'ncm_div' || r.status === 'desc_div' || r.status === 'nao_encontrado');
+
+  if (filtroRevisao === 'pendente') {
+    dados = dados.filter(r => !r._revisao || r._revisao === 'pendente');
+  } else if (filtroRevisao === 'revisado') {
+    dados = dados.filter(r => r._revisao === 'revisado');
+  } else if (filtroRevisao === 'andamento') {
+    dados = dados.filter(r => r._revisao === 'andamento');
+  }
+  // Se '' exporta tudo incluindo ok
+  if (filtroRevisao === '') dados = cosmosResults;
+
+  if (!dados.length) { toast('⚠️ Nenhum resultado para exportar com este filtro', 'error'); return; }
+
+  const rows = dados.map(r => ({
+    PRODUTO: r.prod.PRODUTO,
+    DESCRICAO_THALIA: r.prod.DESCRICAO_PRODUTO,
+    DESCRICAO_COSMOS: r.cosmos?.description||'',
+    EAN: r.prod.CODIGO_BARRAS,
+    NCM_THALIA: r.prod.NCM,
+    NCM_COSMOS: r.cosmos?.ncm?.code ? fmtNcmStr(r.cosmos.ncm.code) : '',
     DESCRICAO_NCM_COSMOS: r.cosmos?.ncm?.description||'',
-    MARCA_THALIA: r.prod.DESCRICAO_MARCA||r.prod.MARCA, MARCA_COSMOS: r.cosmos?.brand?.name||'',
-    STATUS: r.status, DIVERGENCIAS: r.divergencias.join(' | ')
+    MARCA_THALIA: r.prod.DESCRICAO_MARCA||r.prod.MARCA,
+    MARCA_COSMOS: r.cosmos?.brand?.name||'',
+    STATUS: r.status,
+    REVISAO: r._revisao||'pendente',
+    DIVERGENCIAS: r.divergencias.join(' | ')
   }));
-  downloadXlsx(rows, `comparativo_cosmos_${today()}.xlsx`);
+
+  const label = filtroRevisao === 'pendente' ? 'pendentes' : filtroRevisao === 'revisado' ? 'revisados' : 'completo';
+  downloadXlsx(rows, `comparativo_cosmos_${label}_${today()}.xlsx`);
   toast(`⬇️ ${rows.length.toLocaleString('pt-BR')} registros exportados`, 'success');
 }
 
