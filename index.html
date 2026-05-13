@@ -3955,31 +3955,69 @@ async function fetchCosmosAPI(ean) {
 
 async function fetchDotCompany(ean) {
   try {
-    const resp = await fetch(`${getProxyBase()}/dotcompany/${ean}`, { headers: { 'Accept': 'application/json' } });
+    // DotCompany tem CORS habilitado — chama direto sem proxy
+    const resp = await fetch(`https://dotcompany.com.br/api/catalogo/public/buscar?q=${ean}`, {
+      headers: { 'Accept': 'application/json' }
+    });
     if (!resp.ok) return null;
     const data = await resp.json();
     if (!data?.sucesso || !data?.produto) return null;
     const p = data.produto;
-    return { description: p.nome||'', ncm: p.ncm?{code:String(p.ncm),description:''}:null, brand: p.marca?{name:p.marca}:null, thumbnail: p.imagem_url||null, _fonte: 'DotCompany' };
-  } catch(e) { return null; }
+    // Formata NCM: "22021000" → "2202.10.00"
+    let ncmCode = null;
+    if (p.ncm) {
+      const n = String(p.ncm).replace(/\D/g,'').padStart(8,'0');
+      ncmCode = n.length===8 ? `${n.slice(0,4)}.${n.slice(4,6)}.${n.slice(6,8)}` : n;
+    }
+    return {
+      description: p.nome||'',
+      ncm: ncmCode ? { code: ncmCode, description: '' } : null,
+      cest: p.cest||null,
+      brand: p.marca ? { name: p.marca } : null,
+      thumbnail: p.imagem_url||null,
+      _fonte: 'DotCompany'
+    };
+  } catch(e) { console.warn('DotCompany error:', e); return null; }
 }
 
 async function fetchRSC(ean) {
   const creds = localStorage.getItem(RSC_CREDS_KEY);
   if (!creds) return null;
   try {
+    const base = getProxyBase();
+    // Renova token RSC se expirado
     if (!rscToken || Date.now() > rscTokenExp) {
-      const tr = await fetch(`${getProxyBase()}/rsc/token`, { method:'POST', headers:{'X-RSC-Credentials':creds,'Accept':'application/json'} });
-      if (!tr.ok) return null;
+      const tr = await fetch(`${base}/rsc/token`, {
+        method: 'POST',
+        headers: { 'X-RSC-Credentials': creds, 'Accept': 'application/json' }
+      });
+      if (!tr.ok) { console.warn('RSC token falhou:', tr.status); return null; }
       const td = await tr.json();
-      rscToken = td.token; rscTokenExp = Date.now() + 55*60*1000;
+      if (!td.token) { console.warn('RSC sem token na resposta'); return null; }
+      rscToken = td.token;
+      rscTokenExp = Date.now() + 55*60*1000;
     }
-    const resp = await fetch(`${getProxyBase()}/rsc/gtin/${ean}`, { headers: {'X-RSC-Token':rscToken,'Accept':'application/json'} });
+    const resp = await fetch(`${base}/rsc/gtin/${ean}`, {
+      headers: { 'X-RSC-Token': rscToken, 'Accept': 'application/json' }
+    });
+    if (resp.status === 404) return null;
     if (!resp.ok) return null;
     const p = await resp.json();
-    if (!p?.nome) return null;
-    return { description: p.nome||'', ncm: p.ncm?{code:String(p.ncm).padStart(8,'0'),description:''}:null, brand: p.marca?{name:p.marca}:null, thumbnail:null, _fonte:'RSC Sistemas' };
-  } catch(e) { return null; }
+    if (!p?.nome && !p?.name) return null;
+    // Formata NCM
+    let ncmCode = null;
+    if (p.ncm) {
+      const n = String(p.ncm).replace(/\D/g,'').padStart(8,'0');
+      ncmCode = n.length===8 ? `${n.slice(0,4)}.${n.slice(4,6)}.${n.slice(6,8)}` : n;
+    }
+    return {
+      description: p.nome||p.name||'',
+      ncm: ncmCode ? { code: ncmCode, description: '' } : null,
+      brand: p.marca ? { name: p.marca } : null,
+      thumbnail: null,
+      _fonte: 'RSC Sistemas'
+    };
+  } catch(e) { console.warn('RSC error:', e); return null; }
 }
 
 async function fetchCosmos(ean) {
