@@ -4022,10 +4022,22 @@ async function fetchRSC(ean) {
 
 async function fetchCosmos(ean) {
   // Cascata: Cosmos → DotCompany → RSC
-  const cosmos = await fetchCosmosAPI(ean);
-  if (cosmos) return cosmos;
+  // Se Cosmos der 429, não para — continua nas outras fontes
+  try {
+    const cosmos = await fetchCosmosAPI(ean);
+    if (cosmos) return cosmos;
+  } catch(e) {
+    if (e.message === 'LIMITE_429') {
+      // Marca que Cosmos esgotou nesta sessão, mas continua nas outras fontes
+      window._cosmosEsgotado = true;
+    }
+  }
+
+  // DotCompany — sempre tenta (tem CORS nativo, 50/dia)
   const dot = await fetchDotCompany(ean);
   if (dot) return dot;
+
+  // RSC Sistemas — tenta se tiver credenciais
   const rsc = await fetchRSC(ean);
   return rsc;
 }
@@ -4094,13 +4106,6 @@ async function iniciarLote() {
     } catch(e) {
       result = buildCosmosResult(prod, null, e.message);
       erros++;
-      if (e.message === 'LIMITE_429') {
-        cosmosResults.push(result);
-        cosmosStop = true;
-        document.getElementById('cosmos-prog-label').textContent = '⏸ Limite atingido — resultados salvos. Troque o token ou aguarde 1h e continue.';
-        toast('⏸ Limite atingido — ' + processados + ' salvos. Continue depois!', 'info');
-        break;
-      }
     }
     cosmosResults.push(result);
 
@@ -4122,7 +4127,8 @@ async function iniciarLote() {
     const pct = Math.round(processados / total * 100);
     document.getElementById('cosmos-prog-bar').style.width = pct + '%';
     document.getElementById('cosmos-prog-pct').textContent = pct + '%';
-    document.getElementById('cosmos-prog-label').textContent = `Consultando... ${processados.toLocaleString('pt-BR')} / ${total.toLocaleString('pt-BR')} novos`;
+    const fontesAtivas = ['DotCompany', localStorage.getItem(RSC_CREDS_KEY)?'RSC':'', window._cosmosEsgotado?'':'Cosmos'].filter(Boolean).join(' + ');
+    document.getElementById('cosmos-prog-label').textContent = `Consultando... ${processados.toLocaleString('pt-BR')} / ${total.toLocaleString('pt-BR')} | Fontes: ${fontesAtivas}`;
     document.getElementById('cosmos-prog-detail').textContent =
       `Encontrados: ${encontrados} · Não encontrados: ${processados-encontrados-erros} · Erros: ${erros} · Cache: ${jaConsultados.size+processados}`;
     if (processados % 5 === 0) { renderCosmosKpis(); renderCosmosTable(); }
