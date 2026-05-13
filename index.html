@@ -4073,7 +4073,16 @@ async function iniciarLote() {
     } catch(e) { console.warn('Erro cache:', e); }
   }
 
-  const pendentes = base.filter(r => !jaConsultados.has(r.PRODUTO) && !jaConsultados.has(r.CODIGO_BARRAS));
+  const pendentes = base.filter(r => {
+    // Já consultado e encontrado → pula
+    if (jaConsultados.has(r.PRODUTO) || jaConsultados.has(r.CODIGO_BARRAS)) {
+      // Mas se estava como "não encontrado", tenta novamente (pode ter crédito novo)
+      const cached = cosmosResults.find(x => x.prod.PRODUTO === r.PRODUTO);
+      if (cached && cached.status === 'nao_encontrado') return true;
+      return false;
+    }
+    return true;
+  });
   const lista = limit > 0 ? pendentes.slice(0, limit) : pendentes;
 
   if (!lista.length) {
