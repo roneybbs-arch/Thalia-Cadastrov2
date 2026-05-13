@@ -1144,49 +1144,25 @@ tr:hover td{background:var(--green-light)}
 
   <!-- CONFIG TOKEN -->
   <div class="card" style="margin-bottom:20px;padding:18px 24px" id="cosmos-config-card">
-    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:14px">⚙️ Configuração das fontes de dados</div>
-
-    <!-- Linha 1: Cosmos -->
-    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">
-      <div style="flex:1;min-width:200px">
-        <label style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:5px">🔵 Token Cosmos Bluesoft <small style="color:var(--text-3);font-weight:400">(25/dia grátis)</small></label>
-        <input type="text" id="cosmos-token" placeholder="pcgwjFpXRT18r5RW0_caUg" style="font-family:monospace;font-size:12px">
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">
+      <div style="flex:1;min-width:240px">
+        <label style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:5px">Token da API Cosmos <small style="color:var(--text-3);font-weight:400">(25/dia grátis — cosmos.bluesoft.com.br)</small></label>
+        <input type="text" id="cosmos-token" placeholder="pcgwjFpXRT18r5RW0_caUg" style="font-family:monospace;font-size:13px">
       </div>
       <div style="flex:1;min-width:240px" id="cosmos-proxy-field">
         <label style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:5px">☁️ URL do Proxy Cloudflare</label>
-        <input type="text" id="cosmos-proxy-url" placeholder="https://cosmos-proxy.roneybbs.workers.dev/cosmos" style="font-family:monospace;font-size:11px">
+        <input type="text" id="cosmos-proxy-url" placeholder="https://cosmos-proxy.roneybbs.workers.dev/cosmos" style="font-family:monospace;font-size:12px">
       </div>
     </div>
-
-    <!-- Linha 2: DotCompany + RSC -->
-    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
-      <div style="flex:1;min-width:200px">
-        <label style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:5px">🟢 DotCompany <small style="color:var(--text-3);font-weight:400">(50/dia grátis)</small></label>
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;text-transform:none;font-size:13px;font-weight:400;color:var(--text);letter-spacing:0">
-            <input type="checkbox" id="toggle-dot" checked onchange="saveFonteToggles()" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer">
-            Usar DotCompany como fallback
-          </label>
-        </div>
-      </div>
-      <div style="flex:1;min-width:200px">
-        <label style="font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:5px">🟡 RSC Sistemas <small style="color:var(--text-3);font-weight:400">(grátis)</small></label>
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;text-transform:none;font-size:13px;font-weight:400;color:var(--text);letter-spacing:0">
-            <input type="checkbox" id="toggle-rsc" checked onchange="saveFonteToggles()" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer">
-            Usar RSC como fallback
-          </label>
-          <input type="text" id="rsc-creds" placeholder="usuário:senha" style="font-family:monospace;font-size:12px;flex:1">
-        </div>
-      </div>
-    </div>
-
     <div style="display:flex;gap:8px;align-items:center">
-      <button class="btn btn-primary" onclick="saveCosmosToken()">💾 Salvar configurações</button>
-      <a href="https://gtin.rscsistemas.com.br/cadastro" target="_blank" class="btn btn-outline btn-sm">📝 Cadastrar RSC grátis</a>
-      <a href="https://cosmos.bluesoft.com.br/api" target="_blank" class="btn btn-outline btn-sm">🔑 Token Cosmos</a>
+      <button class="btn btn-primary" onclick="saveCosmosToken()">💾 Salvar token</button>
+      <a href="https://cosmos.bluesoft.com.br/api" target="_blank" class="btn btn-outline btn-sm">🔑 Pegar token</a>
     </div>
     <div id="cosmos-token-status" style="margin-top:10px"></div>
+    <!-- Hidden fields for future use -->
+    <input type="hidden" id="toggle-dot">
+    <input type="hidden" id="toggle-rsc">
+    <input type="hidden" id="rsc-creds">
   </div>
 
   <!-- MODO DE CONSULTA -->
@@ -4046,7 +4022,13 @@ async function fetchCosmos(ean) {
     const cosmos = await fetchCosmosAPI(ean);
     if (cosmos) return cosmos;
   } catch(e) {
-    if (e.message === 'LIMITE_429') window._cosmosEsgotado = true;
+    if (e.message === 'LIMITE_429') {
+      window._cosmosEsgotado = true;
+      // Se não tem fallback ativo, lança erro para parar o lote
+      if (!useDot() && !useRSC()) {
+        throw new Error('COSMOS_ESGOTADO_SEM_FALLBACK');
+      }
+    }
   }
   // 2. DotCompany — só se ativado
   if (useDot()) {
@@ -4132,6 +4114,13 @@ async function iniciarLote() {
       result = buildCosmosResult(prod, data);
       if (data) encontrados++;
     } catch(e) {
+      if (e.message === 'COSMOS_ESGOTADO_SEM_FALLBACK') {
+        cosmosStop = true;
+        document.getElementById('cosmos-prog-label').textContent =
+          '⏸ Cosmos esgotado e sem fontes de fallback ativas. Ative DotCompany ou RSC, ou aguarde a meia-noite para o limite resetar.';
+        toast('⏸ Cosmos esgotado. Ative DotCompany/RSC ou aguarde reset do limite.', 'error');
+        break;
+      }
       result = buildCosmosResult(prod, null, e.message);
       erros++;
     }
