@@ -4047,6 +4047,10 @@ function saveFonteToggles() {
 function useDot() { return localStorage.getItem('thalia_use_dot') === '1'; }
 function useRSC() { return localStorage.getItem('thalia_use_rsc') === '1'; }
 
+// Garante que as fontes extras ficam desativadas por padrão
+if (localStorage.getItem('thalia_use_dot') !== '1') localStorage.setItem('thalia_use_dot', '0');
+if (localStorage.getItem('thalia_use_rsc') !== '1') localStorage.setItem('thalia_use_rsc', '0');
+
 async function fetchCosmos(ean) {
   // 1. Tenta Cosmos (sempre)
   try {
