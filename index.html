@@ -3928,8 +3928,10 @@ async function fetchCosmosAPI(ean) {
   const token = localStorage.getItem(COSMOS_TOKEN_KEY);
   if (!token) return null;
   const url = `${COSMOS_API}/gtins/${ean}.json`;
+  console.log('fetchCosmosAPI:', url, 'token:', token?.substring(0,8)+'...');
   for (let t = 1; t <= 2; t++) {
     const resp = await fetch(url, { headers: { 'X-Cosmos-Token': token, 'User-Agent': 'Cosmos-API-Request' } });
+    console.log('Cosmos resp status:', resp.status);
     if (resp.status === 404) return null;
     if (resp.status === 429) {
       if (t < 2) { await new Promise(r => setTimeout(r, 5000)); continue; }
