@@ -1103,6 +1103,7 @@ tr:hover td{background:var(--green-light)}
       <span style="font-size:12px;color:var(--text-2)" id="aprov-sel-info">0 selecionados</span>
       <button class="btn btn-primary btn-sm" onclick="aprovSelectedItems(true)">✅ Aprovar selecionados</button>
       <button class="btn btn-danger btn-sm" onclick="aprovSelectedItems(false)">❌ Rejeitar selecionados</button>
+      <button class="btn btn-outline btn-sm" style="color:var(--green-dark);border-color:var(--green-mid)" onclick="enviarAprovadosParaFila()">📋 Aprovados → Fila de Cadastro</button>
     </div>
 
     <!-- Tabela -->
@@ -1544,6 +1545,40 @@ const NCM_DESC = {
 
 let erpData = [];
 let filaData = [];
+
+// ── FILA PERSISTENTE ─────────────────────────────────────
+async function salvarFilaSupabase() {
+  if (!sbClient || !currentUser || !filaData.length) return;
+  try {
+    // Apaga a fila anterior do usuário e insere a nova
+    await sbClient.from('fila_cadastro').delete().eq('criado_por', currentUser.email);
+    if (filaData.length > 0) {
+      await sbClient.from('fila_cadastro').insert(
+        filaData.map(item => ({
+          dados: item,
+          origem: item._origem || 'manual',
+          criado_por: currentUser.email
+        }))
+      );
+    }
+  } catch(e) { console.warn('Erro ao salvar fila:', e); }
+}
+
+async function carregarFilaSupabase() {
+  if (!sbClient || !currentUser) return;
+  try {
+    const { data, error } = await sbClient
+      .from('fila_cadastro')
+      .select('*')
+      .eq('criado_por', currentUser.email)
+      .order('criado_at', { ascending: true });
+    if (error || !data?.length) return;
+    filaData = data.map(r => r.dados);
+    renderFila();
+    if (filaData.length > 0)
+      toast(`📋 ${filaData.length} item(ns) na fila restaurados`, 'success');
+  } catch(e) { console.warn('Erro ao carregar fila:', e); }
+}
 let fornData = [];
 let currentPage = 1;
 const PER_PAGE = 50;
@@ -2334,6 +2369,7 @@ function salvarCadastro() {
   };
   filaData.push(item);
   renderFila();
+  salvarFilaSupabase();
   toast(`✅ "${full.substring(0,40)}..." adicionado à fila`, 'success');
 }
 
@@ -2444,6 +2480,7 @@ function salvarEdicaoFila() {
   if (btn) { btn.textContent = '✅ Adicionar à Fila de Cadastros'; btn.onclick = salvarCadastro; }
   renderFila();
   limparForm();
+  salvarFilaSupabase();
   toast('✅ Item da fila atualizado!', 'success');
 }
 function limparForm() {
@@ -2555,6 +2592,7 @@ function enfileirarSelecionados() {
     });
   });
   renderFila();
+  salvarFilaSupabase();
   toast(`✅ ${sel.length} itens adicionados à fila de cadastros`, 'success');
 }
 
@@ -2669,7 +2707,7 @@ function exportarNcm() {
   downloadXlsx(rows, `tabela_ncm_cest_thalia.xlsx`);
 }
 
-function limparFila() { if(confirm('Limpar toda a fila de cadastros?')){ filaData=[]; renderFila(); refreshExport(); toast('Fila limpa','info'); } }
+function limparFila() { if(confirm('Limpar toda a fila de cadastros?')){ filaData=[]; renderFila(); refreshExport(); salvarFilaSupabase(); toast('Fila limpa','info'); } }
 
 function downloadXlsx(rows, filename) {
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -3204,6 +3242,7 @@ function onLoginSuccess() {
   setSyncStatus('online');
   applyPerfil(email);
   loadFromSupabase();
+  carregarFilaSupabase(); // Restaura fila pendente
   toast(`👋 Bem-vindo, ${email.split('@')[0]}!`, 'success');
 }
 
@@ -3630,6 +3669,9 @@ function renderAprovTable() {
           ${isPendente ? `
             <button class="btn btn-primary btn-sm" style="padding:3px 8px;font-size:11px" onclick="aprovOne('${r.id}',true)">✅</button>
             <button class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:11px" onclick="aprovOne('${r.id}',false)">❌</button>
+          ` : r.status === 'aprovado' ? `
+            <button class="btn btn-outline btn-sm" style="padding:3px 8px;font-size:11px;color:var(--green-dark);border-color:var(--green-mid)" onclick="enviarParaFila('${r.id}')" title="Enviar para Fila de Cadastro">📋 → Fila</button>
+            <button class="btn btn-outline btn-sm" style="padding:3px 8px;font-size:11px" onclick="aprovOne('${r.id}',null)">↩️</button>
           ` : `
             <button class="btn btn-outline btn-sm" style="padding:3px 8px;font-size:11px" onclick="aprovOne('${r.id}',null)">↩️</button>
           `}
@@ -3655,6 +3697,73 @@ function renderAprovTable() {
   for (let i = s; i <= e; i++) html += `<button class="pg-btn${i===aprovPage?' active':''}" onclick="aprovPage=${i};renderAprovTable()">${i}</button>`;
   if (aprovPage < pages) html += `<button class="pg-btn" onclick="aprovPage=${aprovPage+1};renderAprovTable()">›</button>`;
   pg.innerHTML = html;
+}
+
+function enviarAprovadosParaFila() {
+  const aprovados = aprovData.filter(r => r.status === 'aprovado');
+  if (!aprovados.length) { toast('⚠️ Nenhum item aprovado ainda', 'error'); return; }
+
+  let adicionados = 0;
+  aprovados.forEach(r => {
+    if (filaData.find(f => f._aprov_id === r.id)) return; // já está
+    filaData.push({
+      DESCRICAO_PRODUTO: r.descricao_produto || '',
+      DESCRICAO_REDUZIDA: r.descricao_reduzida || (r.descricao_produto||'').substring(0,35),
+      DESCRICAO_MARCA: r.fornecedor_nome || '',
+      EAN: r.ean || '', COD_REF: r.cod_ref || '',
+      NCM: r.ncm || '', CODIGO_CEST: r.cest || '',
+      PRECO_FABRICA: r.custo || '', PRECO_VENDA: r.venda || '',
+      UNID_CX: r.unid_cx || '', GRAMAGEM: r.gramagem || '',
+      ICMS_ENTRADA: r.icms_entrada || '', ICMS_SAIDA: r.icms_saida || '',
+      TIPO: r.abreviacao || '',
+      _id: Date.now() + Math.random(),
+      _aprov_id: r.id, _origem: 'aprovacao'
+    });
+    adicionados++;
+  });
+
+  if (!adicionados) { toast('ℹ️ Todos os aprovados já estão na fila', 'info'); return; }
+  renderFila();
+  salvarFilaSupabase();
+  refreshExport();
+  toast(`📋 ${adicionados} item(ns) aprovado(s) enviado(s) para a Fila de Cadastros!`, 'success');
+}
+
+function enviarParaFila(id) {
+  const r = aprovData.find(x => x.id === id);
+  if (!r) return;
+
+  // Verifica se já está na fila
+  if (filaData.find(f => f._aprov_id === id)) {
+    toast('⚠️ Este item já está na fila de cadastros', 'info');
+    return;
+  }
+
+  const item = {
+    DESCRICAO_PRODUTO: r.descricao_produto || '',
+    DESCRICAO_REDUZIDA: r.descricao_reduzida || (r.descricao_produto||'').substring(0,35),
+    DESCRICAO_MARCA: r.fornecedor_nome || '',
+    EAN: r.ean || '',
+    COD_REF: r.cod_ref || '',
+    NCM: r.ncm || '',
+    CODIGO_CEST: r.cest || '',
+    PRECO_FABRICA: r.custo || '',
+    PRECO_VENDA: r.venda || '',
+    UNID_CX: r.unid_cx || '',
+    GRAMAGEM: r.gramagem || '',
+    ICMS_ENTRADA: r.icms_entrada || '',
+    ICMS_SAIDA: r.icms_saida || '',
+    TIPO: r.abreviacao || '',
+    _id: Date.now() + Math.random(),
+    _aprov_id: id,
+    _origem: 'aprovacao'
+  };
+
+  filaData.push(item);
+  renderFila();
+  salvarFilaSupabase();
+  refreshExport();
+  toast(`📋 "${(r.descricao_produto||'').substring(0,30)}..." enviado para a Fila de Cadastros!`, 'success');
 }
 
 async function aprovOne(id, val) {
